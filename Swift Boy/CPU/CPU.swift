@@ -156,23 +156,32 @@ class CPU {
         switch (memory[pc]) {
         case 0x00:
             // NOP, does nothing
+            
             return (pc + 1, 1)
         case 0x01:
             // LD BC, d16
+            
             c = memory[pc + 1]
             b = memory[pc + 2]
+            
             return (pc + 3, 3)
         case 0x02:
             // LD (BC), A
+            
             memory[bc] = a
+            
             return (pc + 1, 2)
         case 0x03:
             // INC BC
+            
             bc = bc &+ 1
+            
             return (pc + 1, 2)
         case 0x04:
             // INC B
+            
             let oldB = b
+            
             b = b &+ 1
             
             setFlags(zero: b == 0, subtraction: false, halfCarry: check8BitHalfCarry(oldB, 1), carry: nil)
@@ -180,7 +189,9 @@ class CPU {
             return (pc + 1, 1)
         case 0x05:
             // DEC B
+            
             let oldB = b
+            
             b = b &- 1
             
             setFlags(zero: b == 0, subtraction: true, halfCarry: check8BitHalfCarry(oldB, 1), carry: nil)
@@ -274,34 +285,123 @@ class CPU {
         case 0x10:
             throw CPUErrors.Stopped
         case 0x11:
-            return (pc + 1, 1)
+            // LD DE, d16
+            
+            e = memory[pc + 1]
+            d = memory[pc + 2]
+            
+            return (pc + 3, 3)
         case 0x12:
-            return (pc + 1, 1)
+            // LD (DE), A
+            
+            memory[de] = a
+            
+            return (pc + 1, 2)
         case 0x13:
-            return (pc + 1, 1)
+            // INC DE
+            
+            de = de &+ 1
+            
+            return (pc + 1, 2)
         case 0x14:
+            // INC D
+            
+            let carry = check8BitHalfCarry(d, 1)
+            
+            d = d &+ 1
+            
+            setFlags(zero: d == 0, subtraction: false, halfCarry: carry, carry: nil)
+            
             return (pc + 1, 1)
         case 0x15:
+            // DEC D
+            
+            let carry = check8BitHalfCarry(d, twosCompliment(1))
+            
+            d = d &- 1
+            
+            setFlags(zero: d == 0, subtraction: true, halfCarry: carry, carry: nil)
+            
             return (pc + 1, 1)
         case 0x16:
-            return (pc + 1, 1)
+            // LD D, d8
+            
+            d = memory[pc + 1]
+            
+            return (pc + 2, 2)
         case 0x17:
+            // RLA
+            
+            let rotated = a << 1
+            let carry = a & 0b10000000 > 0  // The high bit will become the the carry flag
+            
+            a = rotated & (getFlag(.carry) ? 1 : 0) // The old cary flag becomes bit 0
+            
+            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            
             return (pc + 1, 1)
         case 0x18:
-            return (pc + 1, 1)
+            // JR s8
+            
+            return (pc + UInt16(memory[pc + 1]), 3)
         case 0x19:
-            return (pc + 1, 1)
+            // ADD HL, DE
+            
+            let carry = check16BitHalfCarry(hl, de)
+            
+            hl = hl &+ de
+            
+            setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
+            
+            return (pc + 1, 2)
         case 0x1A:
-            return (pc + 1, 1)
+            // LD A, (DE)
+            
+            a = memory[de]
+            
+            return (pc + 1, 2)
         case 0x1B:
-            return (pc + 1, 1)
+            // DEC DE
+            
+            de = de &- 1
+            
+            return (pc + 1, 2)
         case 0x1C:
+            // INC E
+            
+            let carry = check8BitHalfCarry(e, 1)
+            
+            e = e &+ 1
+            
+            setFlags(zero: e == 0, subtraction: false, halfCarry: carry, carry: nil)
+            
             return (pc + 1, 1)
         case 0x1D:
+            // DEC E
+            
+            let carry = check8BitHalfCarry(e, twosCompliment(1))
+            
+            e = e &- 1
+            
+            setFlags(zero: e == 0, subtraction: true, halfCarry: carry, carry: nil)
+            
             return (pc + 1, 1)
         case 0x1E:
-            return (pc + 1, 1)
+            // LD E, d8
+            
+            e = memory[pc + 1]
+            
+            return (pc + 2, 2)
         case 0x1F:
+            // RRaA
+            
+            let rotated = a >> 1
+            let carry = a & 0b00000001 > 0  // The low bit will become the carry flag
+            
+            a = rotated & (getFlag(.carry) ? 0b10000000 : 0) // The high bit becomes the carry flag
+            
+            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            
             return (pc + 1, 1)
         case 0x20:
             return (pc + 1, 1)
