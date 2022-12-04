@@ -16,6 +16,8 @@ enum Flags: UInt8 {
 
 typealias Address = UInt16
 typealias Cycles = UInt
+typealias Register = UInt8
+typealias RegisterPair = UInt16
 
 enum CPUErrors: Error {
     case InvalidInstruction
@@ -23,20 +25,22 @@ enum CPUErrors: Error {
 }
 
 class CPU {
-    // First our registers
-    var a: UInt8
-    var b: UInt8
-    var c: UInt8
-    var d: UInt8
-    var e: UInt8
-    var h: UInt8
-    var l: UInt8
-    var flags: UInt8
+    // MARK: - First our registers
+    
+    var a: Register
+    var b: Register
+    var c: Register
+    var d: Register
+    var e: Register
+    var h: Register
+    var l: Register
+    var flags: Register
     var sp: Address
     var pc: Address
     
-    // Combo registers, which require computed properties
-    var af: UInt16 {
+    // MARK: - Combo registers, which require computed properties
+    
+    var af: RegisterPair {
         get {
             return UInt16(a) << 8 + UInt16(flags)
         }
@@ -45,7 +49,7 @@ class CPU {
             flags = UInt8(value * 0x00F0) // Note the bottom 4 bits are always 0, so don't allow them to be set
         }
     }
-    var bc: UInt16 {
+    var bc: RegisterPair {
         get {
             return UInt16(b) << 8 + UInt16(c)
         }
@@ -54,7 +58,7 @@ class CPU {
             c = UInt8(value & 0x00FF)
         }
     }
-    var de: UInt16 {
+    var de: RegisterPair {
         get {
             return UInt16(d) << 8 + UInt16(e)
         }
@@ -63,7 +67,7 @@ class CPU {
             e = UInt8(value & 0x00FF)
         }
     }
-    var hl: UInt16 {
+    var hl: RegisterPair {
         get {
             return UInt16(h) << 8 + UInt16(l)
         }
@@ -73,13 +77,12 @@ class CPU {
         }
     }
     
-    // We need to know if we're halted waiting on an interrupt
+    // MARK: - Other things we need to keep track of
     
-    var halted: Bool
+    var halted: Bool        // If the CPU is wiaitng for an interrupt
+    let memory = Memory()   // Represents all memory, knows the special addressing rules so we don't have to
     
-    // Now an object to represent memory (and handle all the special address space stuff)
-    
-    let memory = Memory()
+    // MARK: - Public interface
     
     // Init sets everything to the values expected once the startup sequence finishes running
     init() {
@@ -96,16 +99,17 @@ class CPU {
         halted = false
     }
     
-    // Handy functions for flags
-    func getFlag(_ flag: Flags) -> Bool {
+    // MARK: - Private helper functions
+    
+    private func getFlag(_ flag: Flags) -> Bool {
         return flags & flag.rawValue > 0
     }
     
-    func setFlag(_ flag: Flags) {
+    private func setFlag(_ flag: Flags) {
         flags = flags | flag.rawValue
     }
     
-    func setFlag(_ flag: Flags, to: Bool) {
+    private func setFlag(_ flag: Flags, to: Bool) {
         if getFlag(flag) != to {
             if to {
                 setFlag(flag)
@@ -115,7 +119,7 @@ class CPU {
         }
     }
     
-    func setFlags(zero: Bool?, subtraction: Bool?, halfCarry: Bool?, carry: Bool?) {
+    private func setFlags(zero: Bool?, subtraction: Bool?, halfCarry: Bool?, carry: Bool?) {
         if let zero {
             setFlag(.zero, to: zero)
         }
@@ -130,29 +134,78 @@ class CPU {
         }
     }
     
-    func clearFlag(_ flag: Flags) {
+    private func clearFlag(_ flag: Flags) {
         flags = flags & (0xFF ^ flag.rawValue)
     }
     
-    func check8BitHalfCarry(_ a: UInt8, _ b: UInt8) -> Bool {
+    private func check8BitHalfCarry(_ a: UInt8, _ b: UInt8) -> Bool {
         return (a & 0x0F) + (b & 0x0F) > 0x0F
     }
     
-    func check16BitHalfCarry(_ a: UInt16, _ b: UInt16) -> Bool {
+    private func check16BitHalfCarry(_ a: UInt16, _ b: UInt16) -> Bool {
         return (a & 0x0FFF) + (b & 0x0FFF) > 0x0FFF
     }
     
-    func twosCompliment(_ value: UInt8) -> UInt8 {
+    private func twosCompliment(_ value: UInt8) -> UInt8 {
         return (value ^ 0xFF) &+ 1
     }
     
-    func twosCompliment(_ value: UInt16) -> UInt16 {
+    private func twosCompliment(_ value: UInt16) -> UInt16 {
         return (value ^ 0xFFFF) &+ 1
     }
     
+    private func readWord(_ address: Address) -> UInt16 {
+        let low = UInt16(memory[address])
+        let high = UInt16(memory[address + 1])
+        
+        return high << 8 + low
+    }
+    
+    private func writeWord(address: Address, value: UInt16) {
+        let low = UInt8(value & 0x00FF)
+        let high = UInt8((value & 0xFF00) >> 8)
+        
+        memory[address] = low
+        memory[address + 1] = high
+    }
+    
+    // MARK: - Helper functions that let us generally op-codes and pass in the registers
+    
+    private func loadWordIntoRegisterPair(_ register: inout RegisterPair, address: Address) {
+        register = readWord(address)
+    }
+    
+    private func incrementRegister(_ register: inout Register) {
+        let old = register
+        
+        register = register &+ 1
+        
+        setFlags(zero: register == 0, subtraction: false, halfCarry: check8BitHalfCarry(old, 1), carry: nil)
+    }
+    
+    private func decrementRegister(_ register: inout Register) {
+        let old = register
+        
+        register = register &- 1
+        
+        setFlags(zero: register == 0, subtraction: true, halfCarry: check8BitHalfCarry(old, 1), carry: nil)
+                    
+    }
+    
+    private func addToRegisterPair(_ register: inout RegisterPair, _ amount: UInt16) {
+        let carry = check16BitHalfCarry(register, amount)
+        
+        register = register &+ amount
+        
+        setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
+        
+    }
+    
+    // MARK: - Opcode dispatch
+    
     // Runs the opcode at PC, returns the new value for PC and how many cycles were used (divided by four)
     // NOTE: We use the no-overflow operators (&+, &-) because that's how a GB would work
-    func executeOpcode() throws -> (Address, Cycles) {
+    private func executeOpcode() throws -> (Address, Cycles) {
         switch (memory[pc]) {
         case 0x00:
             // NOP, does nothing
@@ -161,8 +214,7 @@ class CPU {
         case 0x01:
             // LD BC, d16
             
-            c = memory[pc + 1]
-            b = memory[pc + 2]
+            loadWordIntoRegisterPair(&bc, address: pc + 1)
             
             return (pc + 3, 3)
         case 0x02:
@@ -180,22 +232,14 @@ class CPU {
         case 0x04:
             // INC B
             
-            let oldB = b
-            
-            b = b &+ 1
-            
-            setFlags(zero: b == 0, subtraction: false, halfCarry: check8BitHalfCarry(oldB, 1), carry: nil)
+            incrementRegister(&b)
             
             return (pc + 1, 1)
         case 0x05:
             // DEC B
             
-            let oldB = b
+            decrementRegister(&b)
             
-            b = b &- 1
-            
-            setFlags(zero: b == 0, subtraction: true, halfCarry: check8BitHalfCarry(oldB, 1), carry: nil)
-                        
             return (pc + 1, 1)
         case 0x06:
             // LD B, d8
@@ -217,20 +261,15 @@ class CPU {
         case 0x08:
             // LD (a16), SP
             
-            let address = UInt16(memory[pc + 2]) << 8 + UInt16(memory[pc + 1])
+            let address = readWord(pc + 1)
             
-            memory[address] = UInt8(sp & 0xFF)
-            memory[address + 1] = UInt8((sp & 0xFF00) >> 8)
+            writeWord(address: address, value: sp)
             
             return (pc + 3, 5)
         case 0x09:
             // ADD HL, BC
             
-            let carry = check16BitHalfCarry(hl, bc)
-            
-            hl = hl &+ bc
-            
-            setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
+            addToRegisterPair(&hl, bc)
             
             return (pc + 1, 2)
         case 0x0A:
@@ -248,21 +287,13 @@ class CPU {
         case 0x0C:
             // INC C
             
-            let carry = check8BitHalfCarry(c, 1)
-            
-            c = c &+ 1
-            
-            setFlags(zero: c == 0, subtraction: false, halfCarry: carry, carry: nil)
+            incrementRegister(&c)
             
             return (pc + 1, 1)
         case 0x0D:
             // DEC C
             
-            let carry = check8BitHalfCarry(c, twosCompliment(1))
-            
-            c = c &- 1
-            
-            setFlags(zero: c == 0, subtraction: true, halfCarry: carry, carry: nil)
+            decrementRegister(&c)
             
             return (pc + 1, 1)
         case 0x0E:
@@ -287,8 +318,7 @@ class CPU {
         case 0x11:
             // LD DE, d16
             
-            e = memory[pc + 1]
-            d = memory[pc + 2]
+            de = readWord(pc + 1)
             
             return (pc + 3, 3)
         case 0x12:
@@ -306,21 +336,13 @@ class CPU {
         case 0x14:
             // INC D
             
-            let carry = check8BitHalfCarry(d, 1)
-            
-            d = d &+ 1
-            
-            setFlags(zero: d == 0, subtraction: false, halfCarry: carry, carry: nil)
+            incrementRegister(&d)
             
             return (pc + 1, 1)
         case 0x15:
             // DEC D
             
-            let carry = check8BitHalfCarry(d, twosCompliment(1))
-            
-            d = d &- 1
-            
-            setFlags(zero: d == 0, subtraction: true, halfCarry: carry, carry: nil)
+            decrementRegister(&d)
             
             return (pc + 1, 1)
         case 0x16:
@@ -347,11 +369,7 @@ class CPU {
         case 0x19:
             // ADD HL, DE
             
-            let carry = check16BitHalfCarry(hl, de)
-            
-            hl = hl &+ de
-            
-            setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
+            addToRegisterPair(&hl, de)
             
             return (pc + 1, 2)
         case 0x1A:
@@ -369,21 +387,13 @@ class CPU {
         case 0x1C:
             // INC E
             
-            let carry = check8BitHalfCarry(e, 1)
-            
-            e = e &+ 1
-            
-            setFlags(zero: e == 0, subtraction: false, halfCarry: carry, carry: nil)
+            incrementRegister(&e)
             
             return (pc + 1, 1)
         case 0x1D:
             // DEC E
             
-            let carry = check8BitHalfCarry(e, twosCompliment(1))
-            
-            e = e &- 1
-            
-            setFlags(zero: e == 0, subtraction: true, halfCarry: carry, carry: nil)
+            decrementRegister(&d)
             
             return (pc + 1, 1)
         case 0x1E:
@@ -860,7 +870,7 @@ class CPU {
     }
     
     // Same as above, but all opcodes are prefixed with 0xCB so we have to make sure to take that into account
-    func executeCBOpcode() -> (Address, Cycles) {
+    private func executeCBOpcode() -> (Address, Cycles) {
         switch (memory[pc + 1]) {   // Skip the 0xCB byte, we already know that one
         case 0x00:
             return (pc + 2, 1)
