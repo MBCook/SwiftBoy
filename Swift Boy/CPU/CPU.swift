@@ -27,20 +27,20 @@ enum CPUErrors: Error {
 class CPU {
     // MARK: - First our registers
     
-    var a: Register
-    var b: Register
-    var c: Register
-    var d: Register
-    var e: Register
-    var h: Register
-    var l: Register
-    var flags: Register
-    var sp: Address
-    var pc: Address
+    private var a: Register
+    private var b: Register
+    private var c: Register
+    private var d: Register
+    private var e: Register
+    private var h: Register
+    private var l: Register
+    private var flags: Register
+    private var sp: Address
+    private var pc: Address
     
     // MARK: - Combo registers, which require computed properties
     
-    var af: RegisterPair {
+    private var af: RegisterPair {
         get {
             return UInt16(a) << 8 + UInt16(flags)
         }
@@ -49,7 +49,7 @@ class CPU {
             flags = UInt8(value * 0x00F0) // Note the bottom 4 bits are always 0, so don't allow them to be set
         }
     }
-    var bc: RegisterPair {
+    private var bc: RegisterPair {
         get {
             return UInt16(b) << 8 + UInt16(c)
         }
@@ -58,7 +58,7 @@ class CPU {
             c = UInt8(value & 0x00FF)
         }
     }
-    var de: RegisterPair {
+    private var de: RegisterPair {
         get {
             return UInt16(d) << 8 + UInt16(e)
         }
@@ -67,7 +67,7 @@ class CPU {
             e = UInt8(value & 0x00FF)
         }
     }
-    var hl: RegisterPair {
+    private var hl: RegisterPair {
         get {
             return UInt16(h) << 8 + UInt16(l)
         }
@@ -79,8 +79,8 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    var halted: Bool        // If the CPU is wiaitng for an interrupt
-    let memory = Memory()   // Represents all memory, knows the special addressing rules so we don't have to
+    private var halted: Bool        // If the CPU is wiaitng for an interrupt
+    private let memory = Memory()   // Represents all memory, knows the special addressing rules so we don't have to
     
     // MARK: - Public interface
     
@@ -99,20 +99,40 @@ class CPU {
         halted = false
     }
     
+    func logState() {
+        // Write a log line like this:
+        //
+        // A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+        //
+        // The stuff after PCMEM are the values at PC+1, PC+2, PC+3, and PC+4 in memory
+        
+        print("A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
+              "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp)) PC:\(toHex(pc)) " +
+              "PCMEM:\(toHex(pc &+ 1)),\(toHex(pc &+ 2)),\(toHex(pc &+ 3)),\(toHex(pc &+ 4))")
+    }
+    
     // MARK: - Private helper functions
+    
+    private func toHex(_ value: UInt8) -> String {
+        return String(format: "%02X", value)
+    }
+    
+    private func toHex(_ value: UInt16) -> String {
+        return String(format: "%04X", value)
+    }
     
     private func getFlag(_ flag: Flags) -> Bool {
         return flags & flag.rawValue > 0
     }
     
-    private func setFlag(_ flag: Flags) {
+    private func setFlagBit(_ flag: Flags) {
         flags = flags | flag.rawValue
     }
     
     private func setFlag(_ flag: Flags, to: Bool) {
         if getFlag(flag) != to {
             if to {
-                setFlag(flag)
+                setFlagBit(flag)
             } else {
                 clearFlag(flag)
             }
@@ -138,11 +158,11 @@ class CPU {
         flags = flags & (0xFF ^ flag.rawValue)
     }
     
-    private func check8BitHalfCarry(_ a: UInt8, _ b: UInt8) -> Bool {
+    private func checkByteHalfCarry(_ a: UInt8, _ b: UInt8) -> Bool {
         return (a & 0x0F) + (b & 0x0F) > 0x0F
     }
     
-    private func check16BitHalfCarry(_ a: UInt16, _ b: UInt16) -> Bool {
+    private func checkWordHalfCarry(_ a: UInt16, _ b: UInt16) -> Bool {
         return (a & 0x0FFF) + (b & 0x0FFF) > 0x0FFF
     }
     
@@ -169,7 +189,7 @@ class CPU {
         memory[address + 1] = high
     }
     
-    // MARK: - Helper functions that let us generally op-codes and pass in the registers
+    // MARK: - Helper functions that let us generalize op-codes and pass in the registers
     
     private func loadWordIntoRegisterPair(_ register: inout RegisterPair, address: Address) {
         register = readWord(address)
@@ -180,7 +200,7 @@ class CPU {
         
         register = register &+ 1
         
-        setFlags(zero: register == 0, subtraction: false, halfCarry: check8BitHalfCarry(old, 1), carry: nil)
+        setFlags(zero: register == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
     }
     
     private func decrementRegister(_ register: inout Register) {
@@ -188,17 +208,29 @@ class CPU {
         
         register = register &- 1
         
-        setFlags(zero: register == 0, subtraction: true, halfCarry: check8BitHalfCarry(old, 1), carry: nil)
+        setFlags(zero: register == 0, subtraction: true, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
                     
     }
     
     private func addToRegisterPair(_ register: inout RegisterPair, _ amount: UInt16) {
-        let carry = check16BitHalfCarry(register, amount)
+        let carry = checkWordHalfCarry(register, amount)
         
         register = register &+ amount
         
         setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
         
+    }
+    
+    private func jumpByByteOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
+        if getFlag(flag) == !negate {
+            // The flag is set to the right value, jump to the offset
+            
+            return (pc + UInt16(memory[pc + 1]), 3)
+        } else {
+            // The flag was the wrong value, keep going without a jump
+            
+            return (pc + 2, 2)
+        }
     }
     
     // MARK: - Opcode dispatch
@@ -416,15 +448,7 @@ class CPU {
         case 0x20:
             // JR NZ, s8
             
-            if getFlag(.zero) {
-                // The zero flag is set, keep going as normal
-                
-                return (pc + 2, 2)
-            } else {
-                // Zero was not set, jump to the indicated offset
-                
-                return (pc + UInt16(memory[pc + 1]), 3)
-            }
+            return jumpByByteOnFlag(.zero, negate: true)
         case 0x21:
             // LD HL, d16
             
@@ -466,19 +490,41 @@ class CPU {
         case 0x27:
             // DAA
             
-            fatalError("Instruction DAA not implemented yet")
-        case 0x28:
-            // JR NZ, s8
+            // Excellent descriptions of this at:
+            //  https://forums.nesdev.org/viewtopic.php?t=15944
+            //  and https://ehaskins.com/2018-01-30%20Z80%20DAA/
             
-            if getFlag(.zero) {
-                // The zero flag is set, jump to the offset
+            if !getFlag(.subtraction) {
+                // Adjust things if a carry of some kind occured or there is an out of bounds condition
                 
-                return (pc + UInt16(memory[pc + 1]), 3)
+                if getFlag(.carry) || a > 0x99 {
+                    a = a &+ 0x60
+                    setFlagBit(.carry)
+                }
+                
+                if getFlag(.halfCarry) || (a & 0x0F) > 0x09 {
+                    a = a &+ 0x06
+                }
             } else {
-                // Zero was not set, keep going as normal
+                // After subtraction only adjust if there was a carry of some kind
                 
-                return (pc + 2, 2)
+                if getFlag(.carry) {
+                    a = a &- 0x60
+                }
+                
+                if getFlag(.halfCarry) {
+                    a = a &- 0x06
+                }
             }
+            
+            setFlag(.zero, to: a == 0)
+            clearFlag(.halfCarry)
+            
+            return (pc + 1, 1)
+        case 0x28:
+            // JR Z, s8
+            
+            return jumpByByteOnFlag(.zero, negate: false)
         case 0x29:
             // ADD HL, HL
             
@@ -526,36 +572,108 @@ class CPU {
             
             return (pc + 1, 1)
         case 0x30:
-            return (pc + 1, 1)
+            // JR NC, s8
+            
+            return jumpByByteOnFlag(.carry, negate: true)
         case 0x31:
-            return (pc + 1, 1)
+            // LD SP, d16
+            
+            sp = readWord(pc + 1)
+            
+            return (pc + 3, 3)
         case 0x32:
-            return (pc + 1, 1)
+            // LD (HL-), A
+            
+            memory[hl] = a
+            
+            hl = hl &- 1
+            
+            return (pc + 1, 2)
         case 0x33:
-            return (pc + 1, 1)
+            // INC SP
+            
+            sp = sp &+ 1
+            
+            return (pc + 1, 2)
         case 0x34:
-            return (pc + 1, 1)
+            // INC (HL)
+            
+            let old = memory[hl]
+            
+            memory[hl] = memory[hl] &+ 1
+            
+            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
+            
+            return (pc + 1, 3)
         case 0x35:
-            return (pc + 1, 1)
+            // DEC (HL)
+            
+            let old = memory[hl]
+            
+            memory[hl] = memory[hl] &- 1
+            
+            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, twosCompliment(1)), carry: nil)
+            
+            return (pc + 1, 3)
         case 0x36:
-            return (pc + 1, 1)
+            // LD (HL), d8
+            
+            memory[hl] = memory[pc + 1]
+            
+            return (pc + 2, 3)
         case 0x37:
+            // SCF
+            
+            setFlags(zero: nil, subtraction: false, halfCarry: false, carry: true)
+            
             return (pc + 1, 1)
         case 0x38:
-            return (pc + 1, 1)
+            // JR C, s8
+            
+            return jumpByByteOnFlag(.carry, negate: false)
         case 0x39:
-            return (pc + 1, 1)
+            // ADD HL, SP
+            
+            addToRegisterPair(&hl, sp)
+            
+            return (pc + 1, 2)
         case 0x3A:
-            return (pc + 1, 1)
+            // LD A, (HL-)
+            
+            a = memory[hl]
+            
+            hl = hl &- 1
+            
+            return (pc + 1, 2)
         case 0x3B:
-            return (pc + 1, 1)
+            // DEC SP
+            
+            sp = sp &- 1
+            
+            return (pc + 1, 2)
         case 0x3C:
+            // INC A
+            
+            incrementRegister(&a)
+            
             return (pc + 1, 1)
         case 0x3D:
+            // DEC A
+            
+            decrementRegister(&a)
+            
             return (pc + 1, 1)
         case 0x3E:
-            return (pc + 1, 1)
+            // LD A, d8
+            
+            a = memory[pc + 1]
+            
+            return (pc + 2, 2)
         case 0x3F:
+            // CCF
+            
+            setFlags(zero: nil, subtraction: false, halfCarry: false, carry: !getFlag(.carry))
+            
             return (pc + 1, 1)
         case 0x40:
             return (pc + 1, 1)
@@ -837,7 +955,9 @@ class CPU {
         case 0xCA:
             return (pc + 1, 1)
         case 0xCB:
-            // This is a prefix for a second set of 256 instructions. We have a different function to handle those
+            // This is a prefix for a second set of 256 instructions.
+            // We have a different function to handle those.
+            
             return executeCBOpcode()
         case 0xCC:
             return (pc + 1, 1)
@@ -945,7 +1065,7 @@ class CPU {
             return (pc + 1, 1)
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
-            fatalError("Unable to find a case for instruction 0x\(String(format: "%02X", pc + 1))!");
+            fatalError("Unable to find a case for instruction 0x\(toHex(memory[pc]))!");
         }
     }
     
@@ -1466,7 +1586,7 @@ class CPU {
             return (pc + 2, 1)
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
-            fatalError("Unable to find a case for instruction 0xCB\(String(format: "%02X", pc + 1))!");
+            fatalError("Unable to find a case for instruction 0xCB\(toHex(memory[pc &+ 1]))!");
         }
     }
 }
