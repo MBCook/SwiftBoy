@@ -254,12 +254,12 @@ class CPU {
     }
     
     private func addToRegisterPair(_ register: inout RegisterPair, _ amount: UInt16) {
-        let carry = checkWordHalfCarry(register, amount)
+        let halfCarry = checkWordHalfCarry(register, amount)
+        let oldRegister = register
         
         register = register &+ amount
         
-        setFlags(zero: nil, subtraction: false, halfCarry: carry, carry: carry)
-        
+        setFlags(zero: nil, subtraction: false, halfCarry: halfCarry, carry: oldRegister > register)
     }
     
     private func jumpByByteOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
@@ -776,12 +776,12 @@ class CPU {
             // ADD A, ?
             
             let (source, memoryUsed) = getCorrectSource(memory[pc])
-            
-            let carry = checkByteHalfCarry(a, source)
+            let oldA = a
             
             a = a &+ source
             
-            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we wrapped around (oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -795,11 +795,12 @@ class CPU {
             
             source = source &+ (getFlag(.carry) ? 1 : 0)
             
-            let carry = checkByteHalfCarry(a, source)
+            let oldA = a
             
             a = a &+ source
             
-            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we wrapped around (oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -811,11 +812,12 @@ class CPU {
             
             let (source, memoryUsed) = getCorrectSource(memory[pc])
             
-            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            let oldA = a
             
             a = a &- source
             
-            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if the value subtracted from A was bigger than A
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(a, twosCompliment(source)), carry: source > oldA)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -829,11 +831,12 @@ class CPU {
             
             source = source &- (getFlag(.carry) ? 1 : 0)
             
-            let carry = checkByteHalfCarry(a, twosCompliment(source))
-            
+            let oldA = a
+
             a = a &- source
             
-            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if the value subtracted from A was bigger than A
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(a, twosCompliment(source)), carry: source > oldA)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -887,9 +890,8 @@ class CPU {
             
             let (source, memoryUsed) = getCorrectSource(memory[pc])
             
-            let carry = checkByteHalfCarry(a, source)
-            
-            setFlags(zero: a == source, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if the value compated to A was bigger than A (becuase it uses SUB of A - source internally)
+            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarry(a, source), carry: source > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -927,11 +929,12 @@ class CPU {
         case 0xC6:
             // ADD A, d8
             
-            let carry = checkByteHalfCarry(a, memory[pc + 1])
+            let oldA = a
             
             a = a &+ memory[pc + 1]
             
-            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we wrapped around (oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, memory[pc + 1]), carry: oldA > a)
             
             return (pc + 2, 2)
         case 0xC7:
@@ -969,12 +972,12 @@ class CPU {
             // ADC A, d8
             
             let source = memory[pc + 1] &+ (getFlag(.carry) ? 1 : 0)
-            
-            let carry = checkByteHalfCarry(a, source)
+            let oldA = a
             
             a = a &+ source
             
-            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we wrapped around (oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
             
             return (pc + 2, 2)
         case 0xCF:
@@ -1011,12 +1014,12 @@ class CPU {
             // SUB d8
             
             let source = memory[pc + 1]
-            
-            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            let oldA = a
             
             a = a &- source
             
-            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if we subtracted more than was there (oldA < source)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(oldA, twosCompliment(source)), carry: oldA < source)
             
             return (pc + 2, 2)
         case 0xD7:
@@ -1046,13 +1049,15 @@ class CPU {
         case 0xDD:
             throw CPUErrors.InvalidInstruction
         case 0xDE:
-            let source = memory[pc + 1] &- (getFlag(.carry) ? 1 : 0)
+            // SBC A, d8
             
-            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            let source = memory[pc + 1] &- (getFlag(.carry) ? 1 : 0)
+            let oldA = a
             
             a = a &- source
             
-            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if we subtracted more than was there (oldA < source)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(oldA,  twosCompliment(source)), carry: oldA < source)
             
             return (pc + 2, 2)
         case 0xDF:
@@ -1103,12 +1108,12 @@ class CPU {
             // ADD SP, s8
             
             let signedValue = UInt16(Int8(memory[pc + 1]))
-            
-            let carry = checkWordHalfCarry(sp, signedValue)
+            let oldSP = sp
             
             sp = sp &+ signedValue
             
-            setFlags(zero: false, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we wrapped around (oldSP > sp)
+            setFlags(zero: false, subtraction: false, halfCarry: checkWordHalfCarry(oldSP, signedValue), carry: oldSP > sp)
             
             return (pc + 2, 4)
         case 0xE9:
@@ -1188,11 +1193,10 @@ class CPU {
             
             let signedValue = UInt16(Int8(memory[pc + 1]))
             
-            let carry = checkWordHalfCarry(sp, signedValue)
-            
             hl = sp &+ signedValue
             
-            setFlags(zero: false, subtraction: false, halfCarry: carry, carry: carry)
+            // Carry is set if we SP + 8 (which is HL) < SP
+            setFlags(zero: false, subtraction: false, halfCarry: checkWordHalfCarry(sp, signedValue), carry: hl < sp)
             
             return (pc + 2, 3)
         case 0xF9:
@@ -1222,9 +1226,8 @@ class CPU {
             
             let source = memory[pc + 1]
             
-            let carry = checkByteHalfCarry(a, source)
-            
-            setFlags(zero: a == source, subtraction: true, halfCarry: carry, carry: carry)
+            // Carry is set if the value compated to A was bigger than A (becuase it uses SUB of A - source internally)
+            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarry(a, source), carry: source > a)
             
             return (pc + 2, 2)
         case 0xFF:
