@@ -14,10 +14,23 @@ enum Flags: UInt8 {
     case carry = 0b00010000
 }
 
+enum Interrupts: UInt8 {
+    case vblank = 0b00000001
+    case lcdStat = 0b00000010
+    case timer = 0b00000100
+    case serial = 0b00001000
+    case joypad = 0b00010000
+}
+
 typealias Address = UInt16
 typealias Cycles = UInt
 typealias Register = UInt8
 typealias RegisterPair = UInt16
+
+enum SpecialLocations: Address {
+    case interruptEnable = 0xFFFF
+    case interruptFlags = 0xFF0F
+}
 
 enum CPUErrors: Error {
     case InvalidInstruction
@@ -79,8 +92,10 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    private var halted: Bool        // If the CPU is wiaitng for an interrupt
-    private let memory = Memory()   // Represents all memory, knows the special addressing rules so we don't have to
+    private var interruptsEnabledBefore: Bool   // Were the interrupts enabled before the current ISR?
+    private var interruptsEnabled: Bool         // Are interrupts enabled globally?
+    private var halted: Bool                    // If the CPU is wiaitng for an interrupt
+    private let memory = Memory()               // Represents all memory, knows the special addressing rules so we don't have to
     
     // MARK: - Public interface
     
@@ -97,6 +112,8 @@ class CPU {
         sp = 0xFFFE
         pc = 0x0100
         halted = false
+        interruptsEnabledBefore = true
+        interruptsEnabled = true
     }
     
     func logState() {
@@ -965,59 +982,145 @@ class CPU {
             
             return resetVector(1)
         case 0xD0:
-            return (pc + 1, 1)
+            // RET NC
+            
+            return returnOnFlag(.carry, negate: true)
         case 0xD1:
-            return (pc + 1, 1)
+            // POP DE
+            
+            de = pop()
+            
+            return (pc + 1, 3)
         case 0xD2:
-            return (pc + 1, 1)
+            // JMP NC, a16
+            
+            return jumpToWordOnFlag(.carry, negate: true)
         case 0xD3:
-            return (pc + 1, 1)
+            throw CPUErrors.InvalidInstruction
         case 0xD4:
-            throw CPUErrors.InvalidInstruction
+            // CALL NC, a16
+            
+            return callOnFlag(.carry, negate: false)
         case 0xD5:
-            return (pc + 1, 1)
+            // PUSH DE
+            
+            push(de)
+            
+            return (pc + 1, 4)
         case 0xD6:
-            return (pc + 1, 1)
+            // SUB d8
+            
+            let source = memory[pc + 1]
+            
+            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            
+            a = a &- source
+            
+            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 2)
         case 0xD7:
-            return (pc + 1, 1)
+            // RST 2
+            
+            return resetVector(2)
         case 0xD8:
-            throw CPUErrors.InvalidInstruction
+            // RET C
+            
+            return returnOnFlag(.carry, negate: false)
         case 0xD9:
-            return (pc + 1, 1)
+            // RETI
+            
+            interruptsEnabled = interruptsEnabledBefore
+            
+            return (pop(), 4)
         case 0xDA:
-            return (pc + 1, 1)
+            // JMP C, a16
+            
+            return jumpToWordOnFlag(.carry, negate: false)
         case 0xDB:
-            return (pc + 1, 1)
+            throw CPUErrors.InvalidInstruction
         case 0xDC:
-            return (pc + 1, 1)
+            // CALL C, a16
+            
+            return callOnFlag(.carry, negate: false)
         case 0xDD:
             throw CPUErrors.InvalidInstruction
         case 0xDE:
-            return (pc + 1, 1)
+            let source = memory[pc + 1] &- (getFlag(.carry) ? 1 : 0)
+            
+            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            
+            a = a &- source
+            
+            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 2)
         case 0xDF:
-            return (pc + 1, 1)
+            // RST 3
+            
+            return resetVector(3)
         case 0xE0:
-            return (pc + 1, 1)
+            // LD (a8), A
+            
+            memory[0xFF00 + UInt16(memory[pc + 1])] = a
+            
+            return (pc + 2, 3)
         case 0xE1:
-            return (pc + 1, 1)
+            // POP HL
+            
+            hl = pop()
+            
+            return (pc + 1, 3)
         case 0xE2:
-            return (pc + 1, 1)
+            // LD (C), A
+            
+            memory[0xFF00 + UInt16(c)] = a
+            
+            return (pc + 1, 2)
         case 0xE3:
             throw CPUErrors.InvalidInstruction
         case 0xE4:
             throw CPUErrors.InvalidInstruction
         case 0xE5:
-            return (pc + 1, 1)
+            // PUSH HL
+            
+            push(hl)
+            
+            return (pc + 1, 4)
         case 0xE6:
-            return (pc + 1, 1)
+            // AND d8
+            
+            a = a & memory[pc + 1]
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: true, carry: false)
+            
+            return (pc + 2, 2)
         case 0xE7:
-            return (pc + 1, 1)
+            // RST 4
+            
+            return resetVector(4)
         case 0xE8:
-            return (pc + 1, 1)
+            // ADD SP, s8
+            
+            let signedValue = UInt16(Int8(memory[pc + 1]))
+            
+            let carry = checkWordHalfCarry(sp, signedValue)
+            
+            sp = sp &+ signedValue
+            
+            setFlags(zero: false, subtraction: false, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 4)
         case 0xE9:
-            return (pc + 1, 1)
+            // JMP HL
+            
+            return (hl, 1)
         case 0xEA:
-            return (pc + 1, 1)
+            // LD (a16), A
+            
+            memory[readWord(pc + 1)] = a
+            
+            return (pc + 3, 4)
         case 0xEB:
             throw CPUErrors.InvalidInstruction
         case 0xEC:
@@ -1025,41 +1128,109 @@ class CPU {
         case 0xED:
             throw CPUErrors.InvalidInstruction
         case 0xEE:
-            return (pc + 1, 1)
+            // XOR d8
+            
+            a = a ^ memory[pc + 1]
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: false, carry: false)
+            
+            return (pc + 2, 2)
         case 0xEF:
-            return (pc + 1, 1)
+            // RST 5
+            
+            return resetVector(5)
         case 0xF0:
-            return (pc + 1, 1)
+            // LD A, (d8)
+            
+            a = memory[0xFF00 + UInt16(memory[pc + 1])]
+            
+            return (pc + 2, 3)
         case 0xF1:
-            return (pc + 1, 1)
+            // POP AF
+            
+            af = pop()
+            
+            return (pc + 1, 3)
         case 0xF2:
-            return (pc + 1, 1)
+            // LD A, (C)
+            
+            a = memory[0xFF00 + UInt16(c)]
+            
+            return (pc + 1, 2)
         case 0xF3:
+            // DI
+            
+            interruptsEnabled = false
+            
             return (pc + 1, 1)
         case 0xF4:
             throw CPUErrors.InvalidInstruction
         case 0xF5:
-            return (pc + 1, 1)
+            // PUSH AF
+            
+            push(af)
+            
+            return (pc + 1, 4)
         case 0xF6:
-            return (pc + 1, 1)
+            // OR d8
+            
+            a = a | memory[pc + 1]
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: false, carry: false)
+            
+            return (pc + 2, 2)
         case 0xF7:
-            return (pc + 1, 1)
+            // RST 6
+            
+            return resetVector(6)
         case 0xF8:
-            return (pc + 1, 1)
+            // LD HL, SP+s8
+            
+            let signedValue = UInt16(Int8(memory[pc + 1]))
+            
+            let carry = checkWordHalfCarry(sp, signedValue)
+            
+            hl = sp &+ signedValue
+            
+            setFlags(zero: false, subtraction: false, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 3)
         case 0xF9:
-            return (pc + 1, 1)
+            // LD SP, HL
+            
+            sp = hl
+            
+            return (pc + 1, 2)
         case 0xFA:
-            return (pc + 1, 1)
+            // LD A, (a16)
+            
+            a = memory[readWord(pc + 1)]
+            
+            return (pc + 3, 4)
         case 0xFB:
+            // EI
+            
+            interruptsEnabled = true
+            
             return (pc + 1, 1)
         case 0xFC:
             throw CPUErrors.InvalidInstruction
         case 0xFD:
             throw CPUErrors.InvalidInstruction
         case 0xFE:
-            return (pc + 1, 1)
+            // CP d8
+            
+            let source = memory[pc + 1]
+            
+            let carry = checkByteHalfCarry(a, source)
+            
+            setFlags(zero: a == source, subtraction: true, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 2)
         case 0xFF:
-            return (pc + 1, 1)
+            // RST 7
+            
+            return resetVector(7)
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
             fatalError("Unable to find a case for instruction 0x\(toHex(memory[pc]))!");
