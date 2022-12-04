@@ -414,36 +414,116 @@ class CPU {
             
             return (pc + 1, 1)
         case 0x20:
-            return (pc + 1, 1)
+            // JR NZ, s8
+            
+            if getFlag(.zero) {
+                // The zero flag is set, keep going as normal
+                
+                return (pc + 2, 2)
+            } else {
+                // Zero was not set, jump to the indicated offset
+                
+                return (pc + UInt16(memory[pc + 1]), 3)
+            }
         case 0x21:
-            return (pc + 1, 1)
+            // LD HL, d16
+            
+            hl = readWord(pc + 1)
+            
+            return (pc + 3, 3)
         case 0x22:
-            return (pc + 1, 1)
+            // LD (HL+), A
+            
+            memory[hl] = a
+            
+            hl = hl &+ 1
+            
+            return (pc + 1, 2)
         case 0x23:
-            return (pc + 1, 1)
+            // INC HL
+            
+            hl = hl &+ 1
+            
+            return (pc + 1, 2)
         case 0x24:
+            // INC H
+            
+            incrementRegister(&h)
+            
             return (pc + 1, 1)
         case 0x25:
+            // DEC H
+            
+            decrementRegister(&h)
+            
             return (pc + 1, 1)
         case 0x26:
-            return (pc + 1, 1)
+            // LD H, d8
+            
+            h = memory[pc + 1]
+            
+            return (pc + 2, 2)
         case 0x27:
-            return (pc + 1, 1)
+            // DAA
+            
+            fatalError("Instruction DAA not implemented yet")
         case 0x28:
-            return (pc + 1, 1)
+            // JR NZ, s8
+            
+            if getFlag(.zero) {
+                // The zero flag is set, jump to the offset
+                
+                return (pc + UInt16(memory[pc + 1]), 3)
+            } else {
+                // Zero was not set, keep going as normal
+                
+                return (pc + 2, 2)
+            }
         case 0x29:
-            return (pc + 1, 1)
+            // ADD HL, HL
+            
+            addToRegisterPair(&hl, hl)
+            
+            return (pc + 1, 2)
         case 0x2A:
-            return (pc + 1, 1)
+            // LD A, (HL+)
+            
+            a = memory[hl]
+            
+            hl = hl &+ 1
+            
+            return (pc + 1, 2)
         case 0x2B:
-            return (pc + 1, 1)
+            // DEC HL
+            
+            hl = hl &- 1
+            
+            return (pc + 1, 2)
         case 0x2C:
+            // INC L
+            
+            incrementRegister(&l)
+            
             return (pc + 1, 1)
         case 0x2D:
+            // DEC L
+            
+            decrementRegister(&l)
+            
             return (pc + 1, 1)
         case 0x2E:
-            return (pc + 1, 1)
+            // LD L, d8
+            
+            l = memory[pc + 1]
+            
+            return (pc + 2, 2)
         case 0x2F:
+            // CPL
+            
+            a = a ^ 0xFF
+            
+            setFlags(zero: nil, subtraction: true, halfCarry: true, carry: nil)
+            
             return (pc + 1, 1)
         case 0x30:
             return (pc + 1, 1)
