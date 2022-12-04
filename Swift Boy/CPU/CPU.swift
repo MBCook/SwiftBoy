@@ -189,6 +189,30 @@ class CPU {
         memory[address + 1] = high
     }
     
+    private func push(_ value: UInt16) {
+        let low = UInt8(value & 0x00FF)
+        let high = UInt8((value & 0xFF00) >> 8)
+        
+        memory[sp - 1] = low
+        memory[sp - 2] = high
+        
+        sp = sp - 2
+    }
+    
+    private func pop() -> UInt16 {
+        let value = UInt16(memory[sp]) << 8 + UInt16(memory[sp + 1])
+        
+        sp = sp + 2
+        
+        return value
+    }
+    
+    private func resetVector(_ index: UInt8) -> (Address, Cycles) {
+        push(pc)
+        
+        return (UInt16(memory[UInt16(index) * 8]), 4)
+    }
+    
     // MARK: - Helper functions that let us generalize op-codes and pass in the registers
     
     private func loadWordIntoRegisterPair(_ register: inout RegisterPair, address: Address) {
@@ -230,6 +254,48 @@ class CPU {
             // The flag was the wrong value, keep going without a jump
             
             return (pc + 2, 2)
+        }
+    }
+    
+    private func jumpToWordOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
+        if getFlag(flag) == !negate {
+            // The flag is set to the right value, jump to the offset
+            
+            return (readWord(pc + 1), 4)
+        } else {
+            // The flag was the wrong value, keep going without a jump
+            
+            return (pc + 3, 3)
+        }
+    }
+    
+    private func returnOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
+        if getFlag(flag) == !negate {
+            // The flag is set to the right value, perform a return
+            
+            let address = readWord(sp)
+            
+            sp = sp + 2
+
+            return (address, 5)
+        } else {
+            // The flag was the wrong value, keep going without a return
+            
+            return (pc + 1, 2)
+        }
+    }
+    
+    private func callOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
+        if getFlag(flag) == !negate {
+            // The flag is set to the right value, perform a return
+            
+            push(pc)
+            
+            return (readWord(pc + 1), 5)
+        } else {
+            // The flag was the wrong value, keep going without a return
+            
+            return (pc + 3, 3)
         }
     }
     
@@ -435,7 +501,7 @@ class CPU {
             
             return (pc + 2, 2)
         case 0x1F:
-            // RRaA
+            // RRA
             
             let rotated = a >> 1
             let carry = a & 0b00000001 > 0  // The low bit will become the carry flag
@@ -814,40 +880,90 @@ class CPU {
                 return (pc + 1, 1)
             }
         case 0xC0:
-            return (pc + 1, 1)
+            // RET NZ
+            
+            return returnOnFlag(.zero, negate: true)
         case 0xC1:
-            return (pc + 1, 1)
+            // POP BC
+            
+            bc = pop()
+            
+            return (pc + 1, 3)
         case 0xC2:
-            return (pc + 1, 1)
+            // JP NZ, a16
+            
+            return jumpToWordOnFlag(.zero, negate: true)
         case 0xC3:
-            return (pc + 1, 1)
+            // JP a16
+            
+            return (readWord(pc + 1), 4)
         case 0xC4:
-            return (pc + 1, 1)
+            // CALL NZ, a16
+            
+            return callOnFlag(.zero, negate: true)
         case 0xC5:
-            return (pc + 1, 1)
+            // PUSH BC
+            
+            push(bc)
+            
+            return (pc + 1, 4)
         case 0xC6:
-            return (pc + 1, 1)
+            // ADD A, d8
+            
+            let carry = checkByteHalfCarry(a, memory[pc + 1])
+            
+            a = a &+ memory[pc + 1]
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 2)
         case 0xC7:
-            return (pc + 1, 1)
+            // RST 0
+            
+            return resetVector(0)
         case 0xC8:
-            return (pc + 1, 1)
+            // RET Z
+            
+            return returnOnFlag(.zero, negate: false)
         case 0xC9:
-            return (pc + 1, 1)
+            // RET
+            
+            return (pop(), 4)
         case 0xCA:
-            return (pc + 1, 1)
+            // JMP Z, a16
+            
+            return jumpToWordOnFlag(.zero, negate: false)
         case 0xCB:
             // This is a prefix for a second set of 256 instructions.
             // We have a different function to handle those.
             
             return executeCBOpcode()
         case 0xCC:
-            return (pc + 1, 1)
+            // CALL Z, a16
+            
+            return callOnFlag(.zero, negate: false)
         case 0xCD:
-            return (pc + 1, 1)
+            // CALL a16
+            
+            push(pc + 3)
+            
+            return (readWord(pc + 1), 6)
         case 0xCE:
-            return (pc + 1, 1)
+            // ADC A, d8
+            
+            let source = memory[pc + 1] &+ (getFlag(.carry) ? 1 : 0)
+            
+            let carry = checkByteHalfCarry(a, source)
+            
+            a = a &+ source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            
+            return (pc + 2, 2)
         case 0xCF:
-            return (pc + 1, 1)
+            // RST 1
+            
+            return resetVector(1)
         case 0xD0:
             return (pc + 1, 1)
         case 0xD1:
