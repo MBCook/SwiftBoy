@@ -689,134 +689,130 @@ class CPU {
             // Instead of writing all these out, we'll parse out what to do from the patter in the bits in another function
             
             return handleLoadBlock(memory[pc])
-        case 0x80:
-            return (pc + 1, 1)
-        case 0x81:
-            return (pc + 1, 1)
-        case 0x82:
-            return (pc + 1, 1)
-        case 0x83:
-            return (pc + 1, 1)
-        case 0x84:
-            return (pc + 1, 1)
-        case 0x85:
-            return (pc + 1, 1)
-        case 0x86:
-            return (pc + 1, 1)
-        case 0x87:
-            return (pc + 1, 1)
-        case 0x88:
-            return (pc + 1, 1)
-        case 0x89:
-            return (pc + 1, 1)
-        case 0x8A:
-            return (pc + 1, 1)
-        case 0x8B:
-            return (pc + 1, 1)
-        case 0x8C:
-            return (pc + 1, 1)
-        case 0x8D:
-            return (pc + 1, 1)
-        case 0x8E:
-            return (pc + 1, 1)
-        case 0x8F:
-            return (pc + 1, 1)
-        case 0x90:
-            return (pc + 1, 1)
-        case 0x91:
-            return (pc + 1, 1)
-        case 0x92:
-            return (pc + 1, 1)
-        case 0x93:
-            return (pc + 1, 1)
-        case 0x94:
-            return (pc + 1, 1)
-        case 0x95:
-            return (pc + 1, 1)
-        case 0x96:
-            return (pc + 1, 1)
-        case 0x97:
-            return (pc + 1, 1)
-        case 0x98:
-            return (pc + 1, 1)
-        case 0x99:
-            return (pc + 1, 1)
-        case 0x9A:
-            return (pc + 1, 1)
-        case 0x9B:
-            return (pc + 1, 1)
-        case 0x9C:
-            return (pc + 1, 1)
-        case 0x9D:
-            return (pc + 1, 1)
-        case 0x9E:
-            return (pc + 1, 1)
-        case 0x9F:
-            return (pc + 1, 1)
-        case 0xA0:
-            return (pc + 1, 1)
-        case 0xA1:
-            return (pc + 1, 1)
-        case 0xA2:
-            return (pc + 1, 1)
-        case 0xA3:
-            return (pc + 1, 1)
-        case 0xA4:
-            return (pc + 1, 1)
-        case 0xA5:
-            return (pc + 1, 1)
-        case 0xA6:
-            return (pc + 1, 1)
-        case 0xA7:
-            return (pc + 1, 1)
-        case 0xA8:
-            return (pc + 1, 1)
-        case 0xA9:
-            return (pc + 1, 1)
-        case 0xAA:
-            return (pc + 1, 1)
-        case 0xAB:
-            return (pc + 1, 1)
-        case 0xAC:
-            return (pc + 1, 1)
-        case 0xAD:
-            return (pc + 1, 1)
-        case 0xAE:
-            return (pc + 1, 1)
-        case 0xAF:
-            return (pc + 1, 1)
-        case 0xB0:
-            return (pc + 1, 1)
-        case 0xB1:
-            return (pc + 1, 1)
-        case 0xB2:
-            return (pc + 1, 1)
-        case 0xB3:
-            return (pc + 1, 1)
-        case 0xB4:
-            return (pc + 1, 1)
-        case 0xB5:
-            return (pc + 1, 1)
-        case 0xB6:
-            return (pc + 1, 1)
-        case 0xB7:
-            return (pc + 1, 1)
-        case 0xB8:
-            return (pc + 1, 1)
-        case 0xB9:
-            return (pc + 1, 1)
-        case 0xBA:
-            return (pc + 1, 1)
-        case 0xBB:
-            return (pc + 1, 1)
-        case 0xBC:
-            return (pc + 1, 1)
-        case 0xBD:
-            return (pc + 1, 1)
-        case 0xBE:
-            return (pc + 1, 1)
-        case 0xBF:
-            return (pc + 1, 1)
+        case 0x80...0x87:
+            // ADD A, ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            let carry = checkByteHalfCarry(a, source)
+            
+            a = a &+ source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0x88...0x8F:
+            // ADC A, ?
+            
+            var (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            source = source &+ (getFlag(.carry) ? 1 : 0)
+            
+            let carry = checkByteHalfCarry(a, source)
+            
+            a = a &+ source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: carry, carry: carry)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0x90...0x97:
+            // SUB ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            
+            a = a &- source
+            
+            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0x98...0x9F:
+            // SBC ?
+            
+            var (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            source = source &- (getFlag(.carry) ? 1 : 0)
+            
+            let carry = checkByteHalfCarry(a, twosCompliment(source))
+            
+            a = a &- source
+            
+            setFlags(zero: a == 0, subtraction: true, halfCarry: carry, carry: carry)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0xA0...0xA7:
+            // AND ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            a = a & source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: true, carry: false)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0xA8...0xAF:
+            // XOR ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            a = a ^ source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: false, carry: false)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0xB0...0xB7:
+            // OR ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            a = a | source
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: false, carry: false)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
+        case 0xB8...0xBF:
+            // CP ?
+            
+            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            
+            let carry = checkByteHalfCarry(a, source)
+            
+            setFlags(zero: a == source, subtraction: true, halfCarry: carry, carry: carry)
+            
+            if memoryUsed {
+                return (pc + 1, 2)
+            } else {
+                return (pc + 1, 1)
+            }
         case 0xC0:
             return (pc + 1, 1)
         case 0xC1:
