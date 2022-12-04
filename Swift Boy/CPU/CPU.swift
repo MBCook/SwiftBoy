@@ -675,135 +675,20 @@ class CPU {
             setFlags(zero: nil, subtraction: false, halfCarry: false, carry: !getFlag(.carry))
             
             return (pc + 1, 1)
-        case 0x40:
-            return (pc + 1, 1)
-        case 0x41:
-            return (pc + 1, 1)
-        case 0x42:
-            return (pc + 1, 1)
-        case 0x43:
-            return (pc + 1, 1)
-        case 0x44:
-            return (pc + 1, 1)
-        case 0x45:
-            return (pc + 1, 1)
-        case 0x46:
-            return (pc + 1, 1)
-        case 0x47:
-            return (pc + 1, 1)
-        case 0x48:
-            return (pc + 1, 1)
-        case 0x49:
-            return (pc + 1, 1)
-        case 0x4A:
-            return (pc + 1, 1)
-        case 0x4B:
-            return (pc + 1, 1)
-        case 0x4C:
-            return (pc + 1, 1)
-        case 0x4D:
-            return (pc + 1, 1)
-        case 0x4E:
-            return (pc + 1, 1)
-        case 0x4F:
-            return (pc + 1, 1)
-        case 0x50:
-            return (pc + 1, 1)
-        case 0x51:
-            return (pc + 1, 1)
-        case 0x52:
-            return (pc + 1, 1)
-        case 0x53:
-            return (pc + 1, 1)
-        case 0x54:
-            return (pc + 1, 1)
-        case 0x55:
-            return (pc + 1, 1)
-        case 0x56:
-            return (pc + 1, 1)
-        case 0x57:
-            return (pc + 1, 1)
-        case 0x58:
-            return (pc + 1, 1)
-        case 0x59:
-            return (pc + 1, 1)
-        case 0x5A:
-            return (pc + 1, 1)
-        case 0x5B:
-            return (pc + 1, 1)
-        case 0x5C:
-            return (pc + 1, 1)
-        case 0x5D:
-            return (pc + 1, 1)
-        case 0x5E:
-            return (pc + 1, 1)
-        case 0x5F:
-            return (pc + 1, 1)
-        case 0x60:
-            return (pc + 1, 1)
-        case 0x61:
-            return (pc + 1, 1)
-        case 0x62:
-            return (pc + 1, 1)
-        case 0x63:
-            return (pc + 1, 1)
-        case 0x64:
-            return (pc + 1, 1)
-        case 0x65:
-            return (pc + 1, 1)
-        case 0x66:
-            return (pc + 1, 1)
-        case 0x67:
-            return (pc + 1, 1)
-        case 0x68:
-            return (pc + 1, 1)
-        case 0x69:
-            return (pc + 1, 1)
-        case 0x6A:
-            return (pc + 1, 1)
-        case 0x6B:
-            return (pc + 1, 1)
-        case 0x6C:
-            return (pc + 1, 1)
-        case 0x6D:
-            return (pc + 1, 1)
-        case 0x6E:
-            return (pc + 1, 1)
-        case 0x6F:
-            return (pc + 1, 1)
-        case 0x70:
-            return (pc + 1, 1)
-        case 0x71:
-            return (pc + 1, 1)
-        case 0x72:
-            return (pc + 1, 1)
-        case 0x73:
-            return (pc + 1, 1)
-        case 0x74:
-            return (pc + 1, 1)
-        case 0x75:
-            return (pc + 1, 1)
         case 0x76:
+            // Note: This is the one exception in the interval below.
+            // So we'll handle it here to exclude it even though that's out of order
+            
             halted = true
+            
             return (pc + 1, 1)
-        case 0x77:
-            return (pc + 1, 1)
-        case 0x78:
-            return (pc + 1, 1)
-        case 0x79:
-            return (pc + 1, 1)
-        case 0x7A:
-            return (pc + 1, 1)
-        case 0x7B:
-            return (pc + 1, 1)
-        case 0x7C:
-            return (pc + 1, 1)
-        case 0x7D:
-            return (pc + 1, 1)
-        case 0x7E:
-            return (pc + 1, 1)
-        case 0x7F:
-            return (pc + 1, 1)
+        case 0x40...0x7F:
+            // LD ?, ? or LD ?, (HL)
+            
+            // This is a big block of load instructions that just have different values for the two parameters.
+            // Instead of writing all these out, we'll parse out what to do from the patter in the bits in another function
+            
+            return handleLoadBlock(memory[pc])
         case 0x80:
             return (pc + 1, 1)
         case 0x81:
@@ -1587,6 +1472,72 @@ class CPU {
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
             fatalError("Unable to find a case for instruction 0xCB\(toHex(memory[pc &+ 1]))!");
+        }
+    }
+    
+    private func handleLoadBlock(_ op: UInt8) -> (Address, Cycles) {
+        // So 0x40 - 0x6F is a bunch of very repeatable instructions. We can use some bit math to decode what's going on.
+        // First we need to figure out the source, which we can get by masking out the last 3 bits
+        
+        var (value, memoryUsed) = getCorrectSource(op)
+            
+        // Now we put it in the right place based on the higher bits
+            
+        switch op {
+        case 0x40...0x47:
+            b = value
+        case 0x48...0x4F:
+            c = value
+        case 0x50...0x57:
+            d = value
+        case 0x58...0x5F:
+            e = value
+        case 0x60...0x67:
+            h = value
+        case 0x68...0x6F:
+            l = value
+        case 0x70...0x77:
+            memory[hl] = value
+            memoryUsed = true
+        case 0x78...0x7F:
+            a = value
+        default:
+            // Xcode has no way of knowing other values won't be passed in
+            fatalError("Unable to find a destination for load instruction 0x\(toHex(op))!");
+        }
+        
+        // We've done the work. Now there is one question left. This all takes 1 cycle, unless we had to access (HL).
+        
+        if memoryUsed {
+            return (pc + 1, 2)  // We accessed memroy, that's two cycles total
+        } else {
+            return (pc + 1, 1)  // Just register access, no memory access
+        }
+    }
+    
+    // Get the source operand, return it and if memory access was used
+    private func getCorrectSource(_ op: UInt8) -> (UInt8, Bool) {
+        // The last 3 bits encode the source for a large number of instructions, so this ends up being handy
+        switch op & 0x07 {
+        case 0:
+            return (b, false)
+        case 1:
+            return (c, false)
+        case 2:
+            return (d, false)
+        case 3:
+            return (e, false)
+        case 4:
+            return (h, false)
+        case 5:
+            return (l, false)
+        case 6:
+            return (memory[hl], true)
+        case 7:
+            return (a, false)
+        default:
+            // Xcode can't seem to figure out we have all possible cases covered
+            fatalError("Unable to find a source operand for instruction 0x\(toHex(op))!");
         }
     }
 }
