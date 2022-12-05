@@ -1391,390 +1391,64 @@ class CPU {
             } else {
                 return (pc + 2, 2)
             }
-        case 0x40:
-            return (pc + 2, 1)
-        case 0x41:
-            return (pc + 2, 1)
-        case 0x42:
-            return (pc + 2, 1)
-        case 0x43:
-            return (pc + 2, 1)
-        case 0x44:
-            return (pc + 2, 1)
-        case 0x45:
-            return (pc + 2, 1)
-        case 0x46:
-            return (pc + 2, 1)
-        case 0x47:
-            return (pc + 2, 1)
-        case 0x48:
-            return (pc + 2, 1)
-        case 0x49:
-            return (pc + 2, 1)
-        case 0x4A:
-            return (pc + 2, 1)
-        case 0x4B:
-            return (pc + 2, 1)
-        case 0x4C:
-            return (pc + 2, 1)
-        case 0x4D:
-            return (pc + 2, 1)
-        case 0x4E:
-            return (pc + 2, 1)
-        case 0x4F:
-            return (pc + 2, 1)
-        case 0x50:
-            return (pc + 2, 1)
-        case 0x51:
-            return (pc + 2, 1)
-        case 0x52:
-            return (pc + 2, 1)
-        case 0x53:
-            return (pc + 2, 1)
-        case 0x54:
-            return (pc + 2, 1)
-        case 0x55:
-            return (pc + 2, 1)
-        case 0x56:
-            return (pc + 2, 1)
-        case 0x57:
-            return (pc + 2, 1)
-        case 0x58:
-            return (pc + 2, 1)
-        case 0x59:
-            return (pc + 2, 1)
-        case 0x5A:
-            return (pc + 2, 1)
-        case 0x5B:
-            return (pc + 2, 1)
-        case 0x5C:
-            return (pc + 2, 1)
-        case 0x5D:
-            return (pc + 2, 1)
-        case 0x5E:
-            return (pc + 2, 1)
-        case 0x5F:
-            return (pc + 2, 1)
-        case 0x60:
-            return (pc + 2, 1)
-        case 0x61:
-            return (pc + 2, 1)
-        case 0x62:
-            return (pc + 2, 1)
-        case 0x63:
-            return (pc + 2, 1)
-        case 0x64:
-            return (pc + 2, 1)
-        case 0x65:
-            return (pc + 2, 1)
-        case 0x66:
-            return (pc + 2, 1)
-        case 0x67:
-            return (pc + 2, 1)
-        case 0x68:
-            return (pc + 2, 1)
-        case 0x69:
-            return (pc + 2, 1)
-        case 0x6A:
-            return (pc + 2, 1)
-        case 0x6B:
-            return (pc + 2, 1)
-        case 0x6C:
-            return (pc + 2, 1)
-        case 0x6D:
-            return (pc + 2, 1)
-        case 0x6E:
-            return (pc + 2, 1)
-        case 0x6F:
-            return (pc + 2, 1)
-        case 0x70:
-            return (pc + 2, 1)
-        case 0x71:
-            return (pc + 2, 1)
-        case 0x72:
-            return (pc + 2, 1)
-        case 0x73:
-            return (pc + 2, 1)
-        case 0x74:
-            return (pc + 2, 1)
-        case 0x75:
-            return (pc + 2, 1)
-        case 0x76:
-            return (pc + 2, 1)
-        case 0x77:
-            return (pc + 2, 1)
-        case 0x78:
-            return (pc + 2, 1)
-        case 0x79:
-            return (pc + 2, 1)
-        case 0x7A:
-            return (pc + 2, 1)
-        case 0x7B:
-            return (pc + 2, 1)
-        case 0x7C:
-            return (pc + 2, 1)
-        case 0x7D:
-            return (pc + 2, 1)
-        case 0x7E:
-            return (pc + 2, 1)
-        case 0x7F:
-            return (pc + 2, 1)
-        case 0x80:
-            return (pc + 2, 1)
-        case 0x81:
-            return (pc + 2, 1)
-        case 0x82:
-            return (pc + 2, 1)
-        case 0x83:
-            return (pc + 2, 1)
-        case 0x84:
-            return (pc + 2, 1)
-        case 0x85:
-            return (pc + 2, 1)
-        case 0x86:
-            return (pc + 2, 1)
-        case 0x87:
-            return (pc + 2, 1)
-        case 0x88:
-            return (pc + 2, 1)
-        case 0x89:
-            return (pc + 2, 1)
-        case 0x8A:
-            return (pc + 2, 1)
-        case 0x8B:
-            return (pc + 2, 1)
-        case 0x8C:
-            return (pc + 2, 1)
-        case 0x8D:
-            return (pc + 2, 1)
-        case 0x8E:
-            return (pc + 2, 1)
-        case 0x8F:
-            return (pc + 2, 1)
-        case 0x90:
-            return (pc + 2, 1)
-        case 0x91:
-            return (pc + 2, 1)
-        case 0x92:
-            return (pc + 2, 1)
-        case 0x93:
-            return (pc + 2, 1)
-        case 0x94:
-            return (pc + 2, 1)
-        case 0x95:
-            return (pc + 2, 1)
-        case 0x96:
-            return (pc + 2, 1)
-        case 0x97:
-            return (pc + 2, 1)
-        case 0x98:
-            return (pc + 2, 1)
-        case 0x99:
-            return (pc + 2, 1)
-        case 0x9A:
-            return (pc + 2, 1)
-        case 0x9B:
-            return (pc + 2, 1)
-        case 0x9C:
-            return (pc + 2, 1)
-        case 0x9D:
-            return (pc + 2, 1)
-        case 0x9E:
-            return (pc + 2, 1)
-        case 0x9F:
-            return (pc + 2, 1)
-        case 0xA0:
-            return (pc + 2, 1)
-        case 0xA1:
-            return (pc + 2, 1)
-        case 0xA2:
-            return (pc + 2, 1)
-        case 0xA3:
-            return (pc + 2, 1)
-        case 0xA4:
-            return (pc + 2, 1)
-        case 0xA5:
-            return (pc + 2, 1)
-        case 0xA6:
-            return (pc + 2, 1)
-        case 0xA7:
-            return (pc + 2, 1)
-        case 0xA8:
-            return (pc + 2, 1)
-        case 0xA9:
-            return (pc + 2, 1)
-        case 0xAA:
-            return (pc + 2, 1)
-        case 0xAB:
-            return (pc + 2, 1)
-        case 0xAC:
-            return (pc + 2, 1)
-        case 0xAD:
-            return (pc + 2, 1)
-        case 0xAE:
-            return (pc + 2, 1)
-        case 0xAF:
-            return (pc + 2, 1)
-        case 0xB0:
-            return (pc + 2, 1)
-        case 0xB1:
-            return (pc + 2, 1)
-        case 0xB2:
-            return (pc + 2, 1)
-        case 0xB3:
-            return (pc + 2, 1)
-        case 0xB4:
-            return (pc + 2, 1)
-        case 0xB5:
-            return (pc + 2, 1)
-        case 0xB6:
-            return (pc + 2, 1)
-        case 0xB7:
-            return (pc + 2, 1)
-        case 0xB8:
-            return (pc + 2, 1)
-        case 0xB9:
-            return (pc + 2, 1)
-        case 0xBA:
-            return (pc + 2, 1)
-        case 0xBB:
-            return (pc + 2, 1)
-        case 0xBC:
-            return (pc + 2, 1)
-        case 0xBD:
-            return (pc + 2, 1)
-        case 0xBE:
-            return (pc + 2, 1)
-        case 0xBF:
-            return (pc + 2, 1)
-        case 0xC0:
-            return (pc + 2, 1)
-        case 0xC1:
-            return (pc + 2, 1)
-        case 0xC2:
-            return (pc + 2, 1)
-        case 0xC3:
-            return (pc + 2, 1)
-        case 0xC4:
-            return (pc + 2, 1)
-        case 0xC5:
-            return (pc + 2, 1)
-        case 0xC6:
-            return (pc + 2, 1)
-        case 0xC7:
-            return (pc + 2, 1)
-        case 0xC8:
-            return (pc + 2, 1)
-        case 0xC9:
-            return (pc + 2, 1)
-        case 0xCA:
-            return (pc + 2, 1)
-        case 0xCB:
-            return (pc + 2, 1)
-        case 0xCC:
-            return (pc + 2, 1)
-        case 0xCD:
-            return (pc + 2, 1)
-        case 0xCE:
-            return (pc + 2, 1)
-        case 0xCF:
-            return (pc + 2, 1)
-        case 0xD0:
-            return (pc + 2, 1)
-        case 0xD1:
-            return (pc + 2, 1)
-        case 0xD2:
-            return (pc + 2, 1)
-        case 0xD3:
-            return (pc + 2, 1)
-        case 0xD4:
-            return (pc + 2, 1)
-        case 0xD5:
-            return (pc + 2, 1)
-        case 0xD6:
-            return (pc + 2, 1)
-        case 0xD7:
-            return (pc + 2, 1)
-        case 0xD8:
-            return (pc + 2, 1)
-        case 0xD9:
-            return (pc + 2, 1)
-        case 0xDA:
-            return (pc + 2, 1)
-        case 0xDB:
-            return (pc + 2, 1)
-        case 0xDC:
-            return (pc + 2, 1)
-        case 0xDD:
-            return (pc + 2, 1)
-        case 0xDE:
-            return (pc + 2, 1)
-        case 0xDF:
-            return (pc + 2, 1)
-        case 0xE0:
-            return (pc + 2, 1)
-        case 0xE1:
-            return (pc + 2, 1)
-        case 0xE2:
-            return (pc + 2, 1)
-        case 0xE3:
-            return (pc + 2, 1)
-        case 0xE4:
-            return (pc + 2, 1)
-        case 0xE5:
-            return (pc + 2, 1)
-        case 0xE6:
-            return (pc + 2, 1)
-        case 0xE7:
-            return (pc + 2, 1)
-        case 0xE8:
-            return (pc + 2, 1)
-        case 0xE9:
-            return (pc + 2, 1)
-        case 0xEA:
-            return (pc + 2, 1)
-        case 0xEB:
-            return (pc + 2, 1)
-        case 0xEC:
-            return (pc + 2, 1)
-        case 0xED:
-            return (pc + 2, 1)
-        case 0xEE:
-            return (pc + 2, 1)
-        case 0xEF:
-            return (pc + 2, 1)
-        case 0xF0:
-            return (pc + 2, 1)
-        case 0xF1:
-            return (pc + 2, 1)
-        case 0xF2:
-            return (pc + 2, 1)
-        case 0xF3:
-            return (pc + 2, 1)
-        case 0xF4:
-            return (pc + 2, 1)
-        case 0xF5:
-            return (pc + 2, 1)
-        case 0xF6:
-            return (pc + 2, 1)
-        case 0xF7:
-            return (pc + 2, 1)
-        case 0xF8:
-            return (pc + 2, 1)
-        case 0xF9:
-            return (pc + 2, 1)
-        case 0xFA:
-            return (pc + 2, 1)
-        case 0xFB:
-            return (pc + 2, 1)
-        case 0xFC:
-            return (pc + 2, 1)
-        case 0xFD:
-            return (pc + 2, 1)
-        case 0xFE:
-            return (pc + 2, 1)
-        case 0xFF:
-            return (pc + 2, 1)
+        case 0x40...0x7F:
+            // BIT #, ?
+            
+            // Which bit we want is in bits 5-3 of the opcode, so we'll extract it
+            
+            let bit = (memory[pc + 1] & 0b00111000) >> 3
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            // Find out if that bit is set
+            
+            let bitSet = (1 << bit) & value > 0
+            
+            setFlags(zero: !bitSet, subtraction: false, halfCarry: true, carry: nil)
+            
+            if memoryUsed {
+                return (pc + 2, 3)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x80...0xBF:
+            // RES #, ?
+            
+            // Which bit we want is in bits 5-3 of the opcode, so we'll extract it
+            
+            let bit = (memory[pc + 1] & 0b00111000) >> 3
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            // Generate our mask without that bit in it
+            
+            let mask = 0xFF as UInt8 - (1 << bit)
+            
+            setCorrectDestination(memory[pc + 1], value: value & mask)
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0xC0...0xFF:
+            // SET #, ?
+            
+            // Which bit we want is in bits 5-3 of the opcode, so we'll extract it
+            
+            let bit = (memory[pc + 1] & 0b00111000) >> 3
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            // Set that bit in the value and put it back where it came from
+            
+            setCorrectDestination(memory[pc + 1], value: value | (1 << bit))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
             fatalError("Unable to find a case for instruction 0xCB\(toHex(memory[pc &+ 1]))!");
