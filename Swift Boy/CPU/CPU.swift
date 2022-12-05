@@ -316,6 +316,78 @@ class CPU {
         }
     }
     
+    private func rotateLeftCopyCarry(_ value: UInt8) -> UInt8 {
+        let rotated = value << 1
+        let carry = value & 0b10000000 > 0  // The high bit will become the low bit AND the carry flag
+        
+        setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated + (carry ? 1 : 0)
+    }
+    
+    private func rotateLeftThroughCarry(_ value: UInt8) -> UInt8 {
+        let rotated = value << 1
+        let carry = value & 0b10000000 > 0  // The high bit will become the the carry flag
+        
+        setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated + (getFlag(.carry) ? 1 : 0) // The old cary flag becomes bit 0
+    }
+    
+    private func rotateRightCopyCarry(_ value: UInt8) -> UInt8 {
+        let rotated = value >> 1
+        let carry = value & 0b00000001 > 0  // The low bit will become the high bit AND the carry flag
+        
+        setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated + (carry ? 0b10000000 : 0)
+    }
+    
+    private func rotateRightThroughCarry(_ value: UInt8) -> UInt8 {
+        let rotated = a >> 1
+        let carry = a & 0b00000001 > 0  // The low bit will become the carry flag
+        
+        setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated & (getFlag(.carry) ? 0b10000000 : 0) // The high bit is now what the carry flag holds
+    }
+    
+    private func arithmeticShiftLeft(_ value: UInt8) -> UInt8 {
+        let rotated = value << 1
+        let carry = value & 0b10000000 > 0
+        
+        setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated
+    }
+    
+    private func arithmeticShiftRight(_ value: UInt8) -> UInt8 {
+        let rotated = value >> 1
+        let carry = value & 0b00000001 > 0
+        let oldBit7 = value & 0b10000000
+        
+        setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated + oldBit7
+    }
+    
+    private func logicalShiftRight(_ value: UInt8) -> UInt8 {
+        let rotated = value >> 1
+        let carry = value & 0b00000001 > 0
+        
+        setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: carry)
+        
+        return rotated
+    }
+    
+    private func swapNibbles(_ value: UInt8) -> UInt8 {
+        let result = value << 4 + value >> 4
+        
+        setFlags(zero: result == 0, subtraction: false, halfCarry: false, carry: false)
+        
+        return result
+    }
+    
     // MARK: - Opcode dispatch
     
     // Runs the opcode at PC, returns the new value for PC and how many cycles were used (divided by four)
@@ -365,12 +437,7 @@ class CPU {
         case 0x07:
             // RLCA
             
-            let rotated = a << 1
-            let carry = a & 0b10000000 > 0  // The high bit will become the low bit AND the carry flag
-            
-            a = rotated & (carry ? 1 : 0)
-            
-            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            a = rotateLeftCopyCarry(a)
             
             return (pc + 1, 1)
         case 0x08:
@@ -420,12 +487,7 @@ class CPU {
         case 0x0F:
             // RRCA
             
-            let rotated = a >> 1
-            let carry = a & 0b00000001 > 0  // The low bit will become the high bit AND the carry flag
-            
-            a = rotated & (carry ? 1 : 0)
-            
-            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            a = rotateRightCopyCarry(a)
             
             return (pc + 1, 1)
         case 0x10:
@@ -469,12 +531,7 @@ class CPU {
         case 0x17:
             // RLA
             
-            let rotated = a << 1
-            let carry = a & 0b10000000 > 0  // The high bit will become the the carry flag
-            
-            a = rotated & (getFlag(.carry) ? 1 : 0) // The old cary flag becomes bit 0
-            
-            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            a = rotateLeftThroughCarry(a)
             
             return (pc + 1, 1)
         case 0x18:
@@ -520,12 +577,7 @@ class CPU {
         case 0x1F:
             // RRA
             
-            let rotated = a >> 1
-            let carry = a & 0b00000001 > 0  // The low bit will become the carry flag
-            
-            a = rotated & (getFlag(.carry) ? 0b10000000 : 0) // The high bit becomes the carry flag
-            
-            setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
+            a = rotateRightThroughCarry(a)
             
             return (pc + 1, 1)
         case 0x20:
@@ -1243,134 +1295,102 @@ class CPU {
     // Same as above, but all opcodes are prefixed with 0xCB so we have to make sure to take that into account
     private func executeCBOpcode() -> (Address, Cycles) {
         switch (memory[pc + 1]) {   // Skip the 0xCB byte, we already know that one
-        case 0x00:
-            return (pc + 2, 1)
-        case 0x01:
-            return (pc + 2, 1)
-        case 0x02:
-            return (pc + 2, 1)
-        case 0x03:
-            return (pc + 2, 1)
-        case 0x04:
-            return (pc + 2, 1)
-        case 0x05:
-            return (pc + 2, 1)
-        case 0x06:
-            return (pc + 2, 1)
-        case 0x07:
-            return (pc + 2, 1)
-        case 0x08:
-            return (pc + 2, 1)
-        case 0x09:
-            return (pc + 2, 1)
-        case 0x0A:
-            return (pc + 2, 1)
-        case 0x0B:
-            return (pc + 2, 1)
-        case 0x0C:
-            return (pc + 2, 1)
-        case 0x0D:
-            return (pc + 2, 1)
-        case 0x0E:
-            return (pc + 2, 1)
-        case 0x0F:
-            return (pc + 2, 1)
-        case 0x10:
-            return (pc + 2, 1)
-        case 0x11:
-            return (pc + 2, 1)
-        case 0x12:
-            return (pc + 2, 1)
-        case 0x13:
-            return (pc + 2, 1)
-        case 0x14:
-            return (pc + 2, 1)
-        case 0x15:
-            return (pc + 2, 1)
-        case 0x16:
-            return (pc + 2, 1)
-        case 0x17:
-            return (pc + 2, 1)
-        case 0x18:
-            return (pc + 2, 1)
-        case 0x19:
-            return (pc + 2, 1)
-        case 0x1A:
-            return (pc + 2, 1)
-        case 0x1B:
-            return (pc + 2, 1)
-        case 0x1C:
-            return (pc + 2, 1)
-        case 0x1D:
-            return (pc + 2, 1)
-        case 0x1E:
-            return (pc + 2, 1)
-        case 0x1F:
-            return (pc + 2, 1)
-        case 0x20:
-            return (pc + 2, 1)
-        case 0x21:
-            return (pc + 2, 1)
-        case 0x22:
-            return (pc + 2, 1)
-        case 0x23:
-            return (pc + 2, 1)
-        case 0x24:
-            return (pc + 2, 1)
-        case 0x25:
-            return (pc + 2, 1)
-        case 0x26:
-            return (pc + 2, 1)
-        case 0x27:
-            return (pc + 2, 1)
-        case 0x28:
-            return (pc + 2, 1)
-        case 0x29:
-            return (pc + 2, 1)
-        case 0x2A:
-            return (pc + 2, 1)
-        case 0x2B:
-            return (pc + 2, 1)
-        case 0x2C:
-            return (pc + 2, 1)
-        case 0x2D:
-            return (pc + 2, 1)
-        case 0x2E:
-            return (pc + 2, 1)
-        case 0x2F:
-            return (pc + 2, 1)
-        case 0x30:
-            return (pc + 2, 1)
-        case 0x31:
-            return (pc + 2, 1)
-        case 0x32:
-            return (pc + 2, 1)
-        case 0x33:
-            return (pc + 2, 1)
-        case 0x34:
-            return (pc + 2, 1)
-        case 0x35:
-            return (pc + 2, 1)
-        case 0x36:
-            return (pc + 2, 1)
-        case 0x37:
-            return (pc + 2, 1)
-        case 0x38:
-            return (pc + 2, 1)
-        case 0x39:
-            return (pc + 2, 1)
-        case 0x3A:
-            return (pc + 2, 1)
-        case 0x3B:
-            return (pc + 2, 1)
-        case 0x3C:
-            return (pc + 2, 1)
-        case 0x3D:
-            return (pc + 2, 1)
-        case 0x3E:
-            return (pc + 2, 1)
-        case 0x3F:
-            return (pc + 2, 1)
+        case 0x00...0x07:
+            // RLC ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: rotateLeftCopyCarry(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x08...0x0F:
+            // RRC ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: rotateRightCopyCarry(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x10...0x17:
+            // RC ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: rotateLeftThroughCarry(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x18...0x1F:
+            // RR ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: rotateRightThroughCarry(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x20...0x27:
+            // SLA ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: arithmeticShiftLeft(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x28...0x2F:
+            // SRA ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: arithmeticShiftRight(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x30...0x37:
+            // SWAP ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: swapNibbles(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
+        case 0x38...0x3F:
+            // SRL ?
+            
+            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            
+            setCorrectDestination(memory[pc + 1], value: logicalShiftRight(value))
+            
+            if memoryUsed {
+                return (pc + 2, 4)
+            } else {
+                return (pc + 2, 2)
+            }
         case 0x40:
             return (pc + 2, 1)
         case 0x41:
@@ -1824,6 +1844,32 @@ class CPU {
         default:
             // Xcode can't seem to figure out we have all possible cases covered
             fatalError("Unable to find a source operand for instruction 0x\(toHex(op))!");
+        }
+    }
+    
+    // Get the source operand, return it and if memory access was used
+    private func setCorrectDestination(_ op: UInt8, value: UInt8) {
+        // The last 3 bits encode the destination for a large number of instructions (same as the source), so this ends up being handy
+        switch op & 0x07 {
+        case 0:
+            b = value
+        case 1:
+            c = value
+        case 2:
+            d = value
+        case 3:
+            e = value
+        case 4:
+            h = value
+        case 5:
+            l = value
+        case 6:
+            memory[hl] = value
+        case 7:
+            a = value
+        default:
+            // Xcode can't seem to figure out we have all possible cases covered
+            fatalError("Unable to find a destination operand for instruction 0x\(toHex(op))!");
         }
     }
 }
