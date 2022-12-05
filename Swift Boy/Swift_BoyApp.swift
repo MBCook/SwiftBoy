@@ -17,6 +17,22 @@ struct Swift_BoyApp: App {
     }
     
     static func main() {
-        print("Nothing yet.")
+        // The file we want to load
+        
+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/03-op sp,hl.gb")
+        
+        // Create memory with that rom
+        
+        do {
+            let memory = try Memory(romLocation: romURL)
+            
+            // Create a CPU
+            
+            let cpu = CPU(memory: memory)
+            
+            cpu.run()
+        } catch {
+            print("Error occured: \(error.localizedDescription)")
+        }
     }
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C13DD47293D7D8A00C8786C /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C13DD46293D7D8A00C8786C /* Settings.swift */; };
 		4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */; };
 		4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B942293C263800D4EEA0 /* ContentView.swift */; };
 		4C35B945293C263900D4EEA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B944293C263900D4EEA0 /* Assets.xcassets */; };
@@ -16,6 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		4C13DD46293D7D8A00C8786C /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		4C35B93D293C263800D4EEA0 /* Swift Boy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Swift Boy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swift_BoyApp.swift; sourceTree = "<group>"; };
 		4C35B942293C263800D4EEA0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -58,7 +60,7 @@
 		4C35B93F293C263800D4EEA0 /* Swift Boy */ = {
 			isa = PBXGroup;
 			children = (
-				4C35B950293C290900D4EEA0 /* CPU */,
+				4C35B950293C290900D4EEA0 /* System */,
 				4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */,
 				4C35B942293C263800D4EEA0 /* ContentView.swift */,
 				4C35B944293C263900D4EEA0 /* Assets.xcassets */,
@@ -76,13 +78,14 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		4C35B950293C290900D4EEA0 /* CPU */ = {
+		4C35B950293C290900D4EEA0 /* System */ = {
 			isa = PBXGroup;
 			children = (
 				4C35B951293C291600D4EEA0 /* CPU.swift */,
 				4C35B953293C2AEF00D4EEA0 /* Memory.swift */,
+				4C13DD46293D7D8A00C8786C /* Settings.swift */,
 			);
-			path = CPU;
+			path = System;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -159,6 +162,7 @@
 				4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */,
 				4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */,
 				4C35B952293C291600D4EEA0 /* CPU.swift in Sources */,
+				4C13DD47293D7D8A00C8786C /* Settings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

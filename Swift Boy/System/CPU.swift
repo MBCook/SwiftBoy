@@ -33,7 +33,7 @@ enum SpecialLocations: Address {
 }
 
 enum CPUErrors: Error {
-    case InvalidInstruction
+    case InvalidInstruction(_ opcode: UInt8)
     case Stopped
 }
 
@@ -59,7 +59,7 @@ class CPU {
         }
         set(value) {
             a = UInt8(value >> 8)
-            flags = UInt8(value * 0x00F0) // Note the bottom 4 bits are always 0, so don't allow them to be set
+            flags = UInt8(value & 0x00F0) // Note the bottom 4 bits are always 0, so don't allow them to be set
         }
     }
     private var bc: RegisterPair {
@@ -95,16 +95,16 @@ class CPU {
     private var interruptsEnabledBefore: Bool   // Were the interrupts enabled before the current ISR?
     private var interruptsEnabled: Bool         // Are interrupts enabled globally?
     private var halted: Bool                    // If the CPU is wiaitng for an interrupt
-    private let memory = Memory()               // Represents all memory, knows the special addressing rules so we don't have to
+    private let memory: Memory                  // Represents all memory, knows the special addressing rules so we don't have to
     
     // MARK: - Public interface
     
     // Init sets everything to the values expected once the startup sequence finishes running
-    init() {
+    init(memory: Memory) {
         a = 0x01
         b = 0x00
         c = 0x13
-        d = 0x13
+        d = 0x00
         e = 0xD8
         h = 0x01
         l = 0x4D
@@ -114,9 +114,47 @@ class CPU {
         halted = false
         interruptsEnabledBefore = true
         interruptsEnabled = true
+        self.memory = memory
     }
     
-    func logState() {
+    // The main loop that runs the CPU
+    func run() {
+        while !halted {
+            // Fetch the current op
+            
+            if GAMEBOY_DOCTOR {
+                logState()
+            }
+            
+            let op = memory[pc]
+            
+            // Run the op
+            
+            do {
+                let (newPC, _) = try executeOpcode(op)
+                
+                // Update the program counter, we'll ignore the cycles for now
+                
+                pc = newPC
+            } catch CPUErrors.InvalidInstruction(op) {
+                print("Invalid instruction: \(toHex(op))")
+                
+                return
+            } catch CPUErrors.Stopped {
+                print("CPU stopped by instruction")
+                
+                return
+            } catch {
+                print("An unknown error occurred: \(error.localizedDescription)")
+                
+                return
+            }
+        }
+    }
+    
+    // MARK: - Private helper functions
+    
+    private func logState() {
         // Write a log line like this:
         //
         // A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
@@ -125,10 +163,8 @@ class CPU {
         
         print("A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
               "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp)) PC:\(toHex(pc)) " +
-              "PCMEM:\(toHex(pc &+ 1)),\(toHex(pc &+ 2)),\(toHex(pc &+ 3)),\(toHex(pc &+ 4))")
+              "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))")
     }
-    
-    // MARK: - Private helper functions
     
     private func toHex(_ value: UInt8) -> String {
         return String(format: "%02X", value)
@@ -175,12 +211,20 @@ class CPU {
         flags = flags & (0xFF ^ flag.rawValue)
     }
     
-    private func checkByteHalfCarry(_ a: UInt8, _ b: UInt8) -> Bool {
+    private func checkByteHalfCarryAdd(_ a: UInt8, _ b: UInt8) -> Bool {
         return (a & 0x0F) + (b & 0x0F) > 0x0F
     }
     
-    private func checkWordHalfCarry(_ a: UInt16, _ b: UInt16) -> Bool {
+    private func checkByteHalfCarrySubtract(_ a: UInt8, _ b: UInt8) -> Bool {
+        return Int(a & 0x0F) - Int(b & 0x0F) < 0
+    }
+    
+    private func checkWordHalfCarryAdd(_ a: UInt16, _ b: UInt16) -> Bool {
         return (a & 0x0FFF) + (b & 0x0FFF) > 0x0FFF
+    }
+    
+    private func checkWordHalfCarrySubtract(_ a: UInt16, _ b: UInt16) -> Bool {
+        return Int(a & 0x0FFF) - Int(b & 0x0FFF) < 0
     }
     
     private func twosCompliment(_ value: UInt8) -> UInt8 {
@@ -241,7 +285,7 @@ class CPU {
         
         register = register &+ 1
         
-        setFlags(zero: register == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
+        setFlags(zero: register == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(old, 1), carry: nil)
     }
     
     private func decrementRegister(_ register: inout Register) {
@@ -249,12 +293,11 @@ class CPU {
         
         register = register &- 1
         
-        setFlags(zero: register == 0, subtraction: true, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
-                    
+        setFlags(zero: register == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(old, 1), carry: nil)
     }
     
     private func addToRegisterPair(_ register: inout RegisterPair, _ amount: UInt16) {
-        let halfCarry = checkWordHalfCarry(register, amount)
+        let halfCarry = checkWordHalfCarryAdd(register, amount)
         let oldRegister = register
         
         register = register &+ amount
@@ -264,9 +307,13 @@ class CPU {
     
     private func jumpByByteOnFlag(_ flag: Flags, negate: Bool) ->  (Address, Cycles) {
         if getFlag(flag) == !negate {
-            // The flag is set to the right value, jump to the offset
+            // The flag is set to the right value, jump to the offset (which is SIGNED)
             
-            return (pc + UInt16(memory[pc + 1]), 3)
+            let signedOffset = Int8(bitPattern: memory[pc + 1])
+            let signedOffsetExpanded = Int16(signedOffset)
+            let newPC = pc &+ UInt16(bitPattern: signedOffsetExpanded) &+ 2 // The 2 is for the size of this instruction (already 'done')
+            
+            return (newPC, 3)
         } else {
             // The flag was the wrong value, keep going without a jump
             
@@ -326,12 +373,12 @@ class CPU {
     }
     
     private func rotateLeftThroughCarry(_ value: UInt8) -> UInt8 {
-        let rotated = value << 1
+        let rotated = value << 1 + (getFlag(.carry) ? 1 : 0) 
         let carry = value & 0b10000000 > 0  // The high bit will become the the carry flag
         
         setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
         
-        return rotated + (getFlag(.carry) ? 1 : 0) // The old cary flag becomes bit 0
+        return rotated  // The old cary flag becomes bit 0
     }
     
     private func rotateRightCopyCarry(_ value: UInt8) -> UInt8 {
@@ -344,12 +391,12 @@ class CPU {
     }
     
     private func rotateRightThroughCarry(_ value: UInt8) -> UInt8 {
-        let rotated = a >> 1
-        let carry = a & 0b00000001 > 0  // The low bit will become the carry flag
+        let rotated = value >> 1 + (getFlag(.carry) ? 0b10000000 : 0)
+        let carry = value & 0b00000001 > 0  // The low bit will become the carry flag
         
         setFlags(zero: false, subtraction: false, halfCarry: false, carry: carry)
         
-        return rotated & (getFlag(.carry) ? 0b10000000 : 0) // The high bit is now what the carry flag holds
+        return rotated // The high bit is now what the carry flag holds
     }
     
     private func arithmeticShiftLeft(_ value: UInt8) -> UInt8 {
@@ -392,8 +439,8 @@ class CPU {
     
     // Runs the opcode at PC, returns the new value for PC and how many cycles were used (divided by four)
     // NOTE: We use the no-overflow operators (&+, &-) because that's how a GB would work
-    private func executeOpcode() throws -> (Address, Cycles) {
-        switch (memory[pc]) {
+    private func executeOpcode(_ op: UInt8) throws -> (Address, Cycles) {
+        switch (op) {
         case 0x00:
             // NOP, does nothing
             
@@ -537,7 +584,7 @@ class CPU {
         case 0x18:
             // JR s8
             
-            return (pc + UInt16(memory[pc + 1]), 3)
+            return (pc + UInt16(memory[pc + 1]) + 2, 3) // The + 2 is for the bytes of this instruction
         case 0x19:
             // ADD HL, DE
             
@@ -737,7 +784,7 @@ class CPU {
             
             memory[hl] = memory[hl] &+ 1
             
-            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, 1), carry: nil)
+            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(old, 1), carry: nil)
             
             return (pc + 1, 3)
         case 0x35:
@@ -747,7 +794,7 @@ class CPU {
             
             memory[hl] = memory[hl] &- 1
             
-            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarry(old, twosCompliment(1)), carry: nil)
+            setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarrySubtract(old, 1), carry: nil)
             
             return (pc + 1, 3)
         case 0x36:
@@ -823,17 +870,17 @@ class CPU {
             // This is a big block of load instructions that just have different values for the two parameters.
             // Instead of writing all these out, we'll parse out what to do from the patter in the bits in another function
             
-            return handleLoadBlock(memory[pc])
+            return handleLoadBlock(op)
         case 0x80...0x87:
             // ADD A, ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             let oldA = a
             
             a = a &+ source
             
             // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -843,7 +890,7 @@ class CPU {
         case 0x88...0x8F:
             // ADC A, ?
             
-            var (source, memoryUsed) = getCorrectSource(memory[pc])
+            var (source, memoryUsed) = getCorrectSource(op)
             
             source = source &+ (getFlag(.carry) ? 1 : 0)
             
@@ -852,7 +899,7 @@ class CPU {
             a = a &+ source
             
             // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -862,14 +909,14 @@ class CPU {
         case 0x90...0x97:
             // SUB ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             
             let oldA = a
             
             a = a &- source
             
             // Carry is set if the value subtracted from A was bigger than A
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(a, twosCompliment(source)), carry: source > oldA)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > oldA)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -879,7 +926,7 @@ class CPU {
         case 0x98...0x9F:
             // SBC ?
             
-            var (source, memoryUsed) = getCorrectSource(memory[pc])
+            var (source, memoryUsed) = getCorrectSource(op)
             
             source = source &- (getFlag(.carry) ? 1 : 0)
             
@@ -888,7 +935,7 @@ class CPU {
             a = a &- source
             
             // Carry is set if the value subtracted from A was bigger than A
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(a, twosCompliment(source)), carry: source > oldA)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > oldA)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -898,7 +945,7 @@ class CPU {
         case 0xA0...0xA7:
             // AND ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             
             a = a & source
             
@@ -912,7 +959,7 @@ class CPU {
         case 0xA8...0xAF:
             // XOR ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             
             a = a ^ source
             
@@ -926,7 +973,7 @@ class CPU {
         case 0xB0...0xB7:
             // OR ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             
             a = a | source
             
@@ -940,10 +987,10 @@ class CPU {
         case 0xB8...0xBF:
             // CP ?
             
-            let (source, memoryUsed) = getCorrectSource(memory[pc])
+            let (source, memoryUsed) = getCorrectSource(op)
             
             // Carry is set if the value compated to A was bigger than A (becuase it uses SUB of A - source internally)
-            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarry(a, source), carry: source > a)
+            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > a)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -986,7 +1033,7 @@ class CPU {
             a = a &+ memory[pc + 1]
             
             // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, memory[pc + 1]), carry: oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, memory[pc + 1]), carry: oldA > a)
             
             return (pc + 2, 2)
         case 0xC7:
@@ -1029,7 +1076,7 @@ class CPU {
             a = a &+ source
             
             // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarry(oldA, source), carry: oldA > a)
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
             
             return (pc + 2, 2)
         case 0xCF:
@@ -1051,7 +1098,7 @@ class CPU {
             
             return jumpToWordOnFlag(.carry, negate: true)
         case 0xD3:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xD4:
             // CALL NC, a16
             
@@ -1071,7 +1118,7 @@ class CPU {
             a = a &- source
             
             // Carry is set if we subtracted more than was there (oldA < source)
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(oldA, twosCompliment(source)), carry: oldA < source)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: oldA < source)
             
             return (pc + 2, 2)
         case 0xD7:
@@ -1093,13 +1140,13 @@ class CPU {
             
             return jumpToWordOnFlag(.carry, negate: false)
         case 0xDB:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xDC:
             // CALL C, a16
             
             return callOnFlag(.carry, negate: false)
         case 0xDD:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xDE:
             // SBC A, d8
             
@@ -1109,7 +1156,7 @@ class CPU {
             a = a &- source
             
             // Carry is set if we subtracted more than was there (oldA < source)
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarry(oldA,  twosCompliment(source)), carry: oldA < source)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: oldA < source)
             
             return (pc + 2, 2)
         case 0xDF:
@@ -1135,9 +1182,9 @@ class CPU {
             
             return (pc + 1, 2)
         case 0xE3:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xE4:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xE5:
             // PUSH HL
             
@@ -1165,7 +1212,7 @@ class CPU {
             sp = sp &+ signedValue
             
             // Carry is set if we wrapped around (oldSP > sp)
-            setFlags(zero: false, subtraction: false, halfCarry: checkWordHalfCarry(oldSP, signedValue), carry: oldSP > sp)
+            setFlags(zero: false, subtraction: false, halfCarry: checkWordHalfCarryAdd(oldSP, signedValue), carry: oldSP > sp)
             
             return (pc + 2, 4)
         case 0xE9:
@@ -1179,11 +1226,11 @@ class CPU {
             
             return (pc + 3, 4)
         case 0xEB:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xEC:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xED:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xEE:
             // XOR d8
             
@@ -1199,7 +1246,9 @@ class CPU {
         case 0xF0:
             // LD A, (d8)
             
-            a = memory[0xFF00 + UInt16(memory[pc + 1])]
+            let address = 0xFF00 + UInt16(memory[pc + 1])
+            
+            a = memory[address]
             
             return (pc + 2, 3)
         case 0xF1:
@@ -1221,7 +1270,7 @@ class CPU {
             
             return (pc + 1, 1)
         case 0xF4:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xF5:
             // PUSH AF
             
@@ -1243,12 +1292,22 @@ class CPU {
         case 0xF8:
             // LD HL, SP+s8
             
-            let signedValue = UInt16(Int8(memory[pc + 1]))
+            let signedOffset = Int8(bitPattern: memory[pc + 1])
+            let signedOffsetAsUInt = UInt16(bitPattern: Int16(signedOffset))
             
-            hl = sp &+ signedValue
+            hl = sp &+ signedOffsetAsUInt
             
             // Carry is set if we SP + 8 (which is HL) < SP
-            setFlags(zero: false, subtraction: false, halfCarry: checkWordHalfCarry(sp, signedValue), carry: hl < sp)
+            
+            var carry: Bool
+            
+            if signedOffset >= 0 {
+                carry = checkWordHalfCarryAdd(sp, signedOffsetAsUInt)
+            } else {
+                carry = checkWordHalfCarrySubtract(sp, UInt16(abs(Int8(bitPattern: memory[pc + 1]))))
+            }
+            
+            setFlags(zero: false, subtraction: false, halfCarry: carry, carry: hl < sp)
             
             return (pc + 2, 3)
         case 0xF9:
@@ -1270,16 +1329,16 @@ class CPU {
             
             return (pc + 1, 1)
         case 0xFC:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xFD:
-            throw CPUErrors.InvalidInstruction
+            throw CPUErrors.InvalidInstruction(op)
         case 0xFE:
             // CP d8
             
             let source = memory[pc + 1]
             
             // Carry is set if the value compated to A was bigger than A (becuase it uses SUB of A - source internally)
-            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarry(a, source), carry: source > a)
+            setFlags(zero: a == source, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > a)
             
             return (pc + 2, 2)
         case 0xFF:
@@ -1288,7 +1347,7 @@ class CPU {
             return resetVector(7)
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
-            fatalError("Unable to find a case for instruction 0x\(toHex(memory[pc]))!");
+            fatalError("Unable to find a case for instruction 0x\(toHex(op))!");
         }
     }
     
