@@ -254,12 +254,12 @@ class CPU {
         flags = flags & (0xFF ^ flag.rawValue)
     }
     
-    private func checkByteHalfCarryAdd(_ a: UInt8, _ b: UInt8) -> Bool {
-        return (a & 0x0F) + (b & 0x0F) > 0x0F
+    private func checkByteHalfCarryAdd(_ a: UInt8, _ b: UInt8, carry: Bool = false) -> Bool {
+        return ((a & 0x0F) + (b & 0x0F) + (carry ? 1 : 0)) & 0x10 > 0
     }
     
-    private func checkByteHalfCarrySubtract(_ a: UInt8, _ b: UInt8) -> Bool {
-        return Int(a & 0x0F) - Int(b & 0x0F) < 0
+    private func checkByteHalfCarrySubtract(_ a: UInt8, _ b: UInt8, carry: Bool = false) -> Bool {
+        return ((a & 0x0F) &- (b & 0x0F) &- (carry ? 1 : 0)) & 0x10 > 0
     }
     
     private func checkWordHalfCarryAdd(_ a: UInt16, _ b: UInt16) -> Bool {
@@ -1118,13 +1118,19 @@ class CPU {
         case 0xCE:
             // ADC A, d8
             
-            let source = memory[pc + 1] &+ (getFlag(.carry) ? 1 : 0)
+            let source = memory[pc + 1]
+            let extra = UInt8(getFlag(.carry) ? 1 : 0)
+            let subtotal = source &+ extra
             let oldA = a
             
-            a = a &+ source
+            a = a &+ subtotal
             
-            // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
+            let halfCarry = checkByteHalfCarryAdd(oldA, source, carry: extra == 1)
+            
+            // There are two carry possibilities
+            let carry = (oldA &+ source < oldA) || (oldA &+ subtotal < oldA &+ source)
+            
+            setFlags(zero: a == 0, subtraction: false, halfCarry: halfCarry, carry: carry)
             
             return (pc + 2, 2)
         case 0xCF:
@@ -1198,13 +1204,19 @@ class CPU {
         case 0xDE:
             // SBC A, d8
             
-            let source = memory[pc + 1] &- (getFlag(.carry) ? 1 : 0)
+            let source = memory[pc + 1]
+            let extra = UInt8(getFlag(.carry) ? 1 : 0)
+            let subtotal = source &+ extra  // Plus because we want to subtract MORE below
             let oldA = a
             
-            a = a &- source
+            a = a &- subtotal
             
-            // Carry is set if we subtracted more than was there (oldA < source)
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: oldA < source)
+            let halfCarry = checkByteHalfCarrySubtract(oldA, source, carry: extra == 1)
+            
+            // There are two possible carries
+            let carry = (oldA &- source > oldA) || (oldA &- subtotal > oldA &- source)
+            
+            setFlags(zero: a == 0, subtraction: true, halfCarry: halfCarry, carry: carry)
             
             return (pc + 2, 2)
         case 0xDF:
