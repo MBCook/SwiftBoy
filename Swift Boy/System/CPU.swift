@@ -938,16 +938,18 @@ class CPU {
         case 0x88...0x8F:
             // ADC A, ?
             
-            var (source, memoryUsed) = getCorrectSource(op)
+            let (source, memoryUsed) = getCorrectSource(op)
             
-            source = source &+ (getFlag(.carry) ? 1 : 0)
-            
+            let extra = UInt8(getFlag(.carry) ? 1 : 0)
+            let subtotal = source &+ extra
             let oldA = a
             
-            a = a &+ source
+            a = a &+ subtotal
             
-            // Carry is set if we wrapped around (oldA > a)
-            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
+            // There are two carry possibilities
+            let carry = (oldA &+ source < oldA) || (oldA &+ subtotal < oldA &+ source)
+                        
+            setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source, carry: extra == 1), carry: carry)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -964,7 +966,7 @@ class CPU {
             a = a &- source
             
             // Carry is set if the value subtracted from A was bigger than A
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > oldA)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: source > oldA)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -974,16 +976,22 @@ class CPU {
         case 0x98...0x9F:
             // SBC ?
             
-            var (source, memoryUsed) = getCorrectSource(op)
+            let (source, memoryUsed) = getCorrectSource(op)
             
-            source = source &- (getFlag(.carry) ? 1 : 0)
+            let extra = UInt8(getFlag(.carry) ? 1 : 0)
+            let subtotal = source &+ extra   // Plus becasue we want to subtract MORE
             
             let oldA = a
 
-            a = a &- source
+            a = a &- subtotal
+            
+            let halfCarry = checkByteHalfCarrySubtract(oldA, source, carry: extra == 1)
+            
+            // There are two possible carries
+            let carry = (oldA &- source > oldA) || (oldA &- subtotal > oldA &- source)
             
             // Carry is set if the value subtracted from A was bigger than A
-            setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(a, source), carry: source > oldA)
+            setFlags(zero: a == 0, subtraction: true, halfCarry: halfCarry, carry: carry)
             
             if memoryUsed {
                 return (pc + 1, 2)
@@ -1420,7 +1428,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: rotateLeftCopyCarry(value))
+            let rotated = rotateLeftCopyCarry(value)
+            
+            setCorrectDestination(memory[pc + 1], value: rotated)
+            
+            setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1432,7 +1444,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: rotateRightCopyCarry(value))
+            let rotated = rotateRightCopyCarry(value)
+            
+            setCorrectDestination(memory[pc + 1], value: rotated)
+            
+            setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1440,11 +1456,15 @@ class CPU {
                 return (pc + 2, 2)
             }
         case 0x10...0x17:
-            // RC ?
+            // RL ?
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: rotateLeftThroughCarry(value))
+            let rotated = rotateLeftThroughCarry(value)
+            
+            setCorrectDestination(memory[pc + 1], value: rotated)
+            
+            setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1456,7 +1476,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: rotateRightThroughCarry(value))
+            let rotated = rotateRightThroughCarry(value)
+            
+            setCorrectDestination(memory[pc + 1], value: rotated)
+            
+            setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1468,7 +1492,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: arithmeticShiftLeft(value))
+            let shifted = arithmeticShiftLeft(value)
+            
+            setCorrectDestination(memory[pc + 1], value: shifted)
+            
+            setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1480,7 +1508,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: arithmeticShiftRight(value))
+            let shifted = arithmeticShiftRight(value)
+            
+            setCorrectDestination(memory[pc + 1], value: shifted)
+            
+            setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1494,6 +1526,9 @@ class CPU {
             
             setCorrectDestination(memory[pc + 1], value: swapNibbles(value))
             
+            // The swapped value will only be 0 if value was 0
+            setFlags(zero: value == 0, subtraction: false, halfCarry: false, carry: false)
+            
             if memoryUsed {
                 return (pc + 2, 4)
             } else {
@@ -1504,7 +1539,11 @@ class CPU {
             
             let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
             
-            setCorrectDestination(memory[pc + 1], value: logicalShiftRight(value))
+            let shifted = logicalShiftRight(value)
+            
+            setCorrectDestination(memory[pc + 1], value: shifted)
+            
+            setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
             if memoryUsed {
                 return (pc + 2, 4)
