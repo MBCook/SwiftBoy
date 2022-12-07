@@ -23,13 +23,20 @@ enum Interrupts: UInt8 {
 }
 
 typealias Address = UInt16
-typealias Cycles = UInt
+typealias Cycles = UInt8
 typealias Register = UInt8
 typealias RegisterPair = UInt16
 
 enum SpecialLocations: Address {
-    case interruptEnable = 0xFFFF
+    case joypad = 0xFF00
+    
+    case divRegister = 0xFF04
+    case timeCounter = 0xFF05
+    case timeModulo = 0xFF06
+    case timerControl = 0xFF07
+    
     case interruptFlags = 0xFF0F
+    case interruptEnable = 0xFFFF
 }
 
 enum CPUErrors: Error {
@@ -93,15 +100,19 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    private var interruptsEnabledBefore: Bool   // Were the interrupts enabled before the current ISR?
-    private var interruptsEnabled: Bool         // Are interrupts enabled globally?
-    private var halted: Bool                    // If the CPU is wiaitng for an interrupt
-    private let memory: Memory                  // Represents all memory, knows the special addressing rules so we don't have to
+    private var interruptsMasterEnabledBefore: Bool // Were the interrupts enabled before the current ISR?
+    private var interruptsMasterEnabled: Bool       // Are interrupts enabled globally?
+    private var halted: Bool                        // If the CPU is wiaitng for an interrupt
+    private let memory: Memory                      // Represents all memory, knows the special addressing rules so we don't have to
+    private var ticks: UInt16                       // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
+    private var lastDiv: UInt16                     // The last time the DIV register was incremented
+    private var timerCounter: UInt16                // The last time the counter was incremented
     
     // MARK: - Public interface
     
     // Init sets everything to the values expected once the startup sequence finishes running
     init(memory: Memory) {
+        // You can find the default values in many places, https://bgb.bircd.org/pandocs.htm#powerupsequence holds a nice summary
         a = 0x01
         b = 0x00
         c = 0x13
@@ -113,9 +124,22 @@ class CPU {
         sp = 0xFFFE
         pc = 0x0100
         halted = false
-        interruptsEnabledBefore = true
-        interruptsEnabled = true
+        
+        ticks = 0
+        lastDiv = 0
+        timerCounter = 0
+        
+        interruptsMasterEnabledBefore = false
+        interruptsMasterEnabled = false
+        
         self.memory = memory
+        
+        memory[SpecialLocations.timeCounter.rawValue] = 0x00
+        memory[SpecialLocations.timeModulo.rawValue] = 0x00
+        memory[SpecialLocations.timerControl.rawValue] = 0x00
+        
+        memory[SpecialLocations.interruptEnable.rawValue] = 0x00
+        memory[SpecialLocations.interruptFlags.rawValue] = 0x00
     }
     
     // The main loop that runs the CPU
@@ -141,8 +165,10 @@ class CPU {
         let numberFormatter = NumberFormatter()
         numberFormatter.numberStyle = .decimal
         
+        var ticksUsed: Cycles = 0
+        
         while !halted {
-            // Fetch the current op
+            // Do useful stuff to us
             
             if GAMEBOY_DOCTOR {
                 do {
@@ -163,9 +189,17 @@ class CPU {
 //                print(numberFormatter.string(from: NSNumber(integerLiteral: Int(instructionCount)))!)
             }
             
-            let op = memory[pc]
+            // Update the various timers if necessary
             
-            // Run the op
+            handleTimerTicks(ticksUsed)
+            
+            // Handle interrups
+            
+            // TODO: This
+            
+            // Handle the next instruction
+            
+            let op = memory[pc]
             
             do {
                 switch pc {
@@ -179,20 +213,9 @@ class CPU {
                     pc = pc + 0         // To shut Xcode up
                 }
                 
-                let oldA = a
-                let oldB = b
-                let oldC = c
+                // Run the operation, updating the program counter and the number of ticks that were used
                 
-                let (newPC, _) = try executeOpcode(op)
-                
-                if oldA != a && oldB != b && oldC != c {
-                    print("Instruction 0x\(toHex(op)) at PC 0x\(toHex(pc)) changed too many registers. Instruction #\(instructionCount).")
-                    exit(2)
-                }
-                
-                // Update the program counter, we'll ignore the cycles for now
-                
-                pc = newPC
+                (pc, ticksUsed) = try executeOpcode(op)
             } catch CPUErrors.InvalidInstruction(let op) {
                 print("Invalid instruction: \(toHex(op))")
                 
@@ -490,6 +513,16 @@ class CPU {
         setFlags(zero: result == 0, subtraction: false, halfCarry: false, carry: false)
         
         return result
+    }
+    
+    // MARK: - Interrupt servicing
+    
+    private func handleTimerTicks(_ ticks: UInt8) {
+        // TODO: This
+        
+        // Need to keep track of stop vs halt
+        // Stop kills everything until joypad input, then picks up where it left off
+        // Halt stops running new instructions but timers keep going waiting for an interrupt
     }
     
     // MARK: - Opcode dispatch
@@ -1125,7 +1158,7 @@ class CPU {
             // This is a prefix for a second set of 256 instructions.
             // We have a different function to handle those.
             
-            return executeCBOpcode()
+            return executeCBOpcode(memory[pc + 1])
         case 0xCC:
             // CALL Z, a16
             
@@ -1207,7 +1240,7 @@ class CPU {
         case 0xD9:
             // RETI
             
-            interruptsEnabled = interruptsEnabledBefore
+            interruptsMasterEnabled = interruptsMasterEnabledBefore
             
             return (pop(), 4)
         case 0xDA:
@@ -1353,7 +1386,7 @@ class CPU {
         case 0xF3:
             // DI
             
-            interruptsEnabled = false
+            interruptsMasterEnabled = false
             
             return (pc + 1, 1)
         case 0xF4:
@@ -1407,7 +1440,7 @@ class CPU {
         case 0xFB:
             // EI
             
-            interruptsEnabled = true
+            interruptsMasterEnabled = true
             
             return (pc + 1, 1)
         case 0xFC:
@@ -1434,16 +1467,16 @@ class CPU {
     }
     
     // Same as above, but all opcodes are prefixed with 0xCB so we have to make sure to take that into account
-    private func executeCBOpcode() -> (Address, Cycles) {
-        switch (memory[pc + 1]) {   // Skip the 0xCB byte, we already know that one
+    private func executeCBOpcode(_ op: UInt8) -> (Address, Cycles) {
+        switch (op) {   // Skip the 0xCB byte, we already know that one
         case 0x00...0x07:
             // RLC ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let rotated = rotateLeftCopyCarry(value)
             
-            setCorrectDestination(memory[pc + 1], value: rotated)
+            setCorrectDestination(op, value: rotated)
             
             setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
@@ -1455,11 +1488,11 @@ class CPU {
         case 0x08...0x0F:
             // RRC ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let rotated = rotateRightCopyCarry(value)
             
-            setCorrectDestination(memory[pc + 1], value: rotated)
+            setCorrectDestination(op, value: rotated)
             
             setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
@@ -1471,11 +1504,11 @@ class CPU {
         case 0x10...0x17:
             // RL ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let rotated = rotateLeftThroughCarry(value)
             
-            setCorrectDestination(memory[pc + 1], value: rotated)
+            setCorrectDestination(op, value: rotated)
             
             setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
@@ -1487,11 +1520,11 @@ class CPU {
         case 0x18...0x1F:
             // RR ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let rotated = rotateRightThroughCarry(value)
             
-            setCorrectDestination(memory[pc + 1], value: rotated)
+            setCorrectDestination(op, value: rotated)
             
             setFlags(zero: rotated == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
@@ -1503,11 +1536,11 @@ class CPU {
         case 0x20...0x27:
             // SLA ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let shifted = arithmeticShiftLeft(value)
             
-            setCorrectDestination(memory[pc + 1], value: shifted)
+            setCorrectDestination(op, value: shifted)
             
             setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x80 > 0)
             
@@ -1519,11 +1552,11 @@ class CPU {
         case 0x28...0x2F:
             // SRA ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let shifted = arithmeticShiftRight(value)
             
-            setCorrectDestination(memory[pc + 1], value: shifted)
+            setCorrectDestination(op, value: shifted)
             
             setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
@@ -1535,9 +1568,9 @@ class CPU {
         case 0x30...0x37:
             // SWAP ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
-            setCorrectDestination(memory[pc + 1], value: swapNibbles(value))
+            setCorrectDestination(op, value: swapNibbles(value))
             
             // The swapped value will only be 0 if value was 0
             setFlags(zero: value == 0, subtraction: false, halfCarry: false, carry: false)
@@ -1550,11 +1583,11 @@ class CPU {
         case 0x38...0x3F:
             // SRL ?
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             let shifted = logicalShiftRight(value)
             
-            setCorrectDestination(memory[pc + 1], value: shifted)
+            setCorrectDestination(op, value: shifted)
             
             setFlags(zero: shifted == 0, subtraction: false, halfCarry: false, carry: value & 0x01 > 0)
             
@@ -1570,7 +1603,7 @@ class CPU {
             
             let bit = (memory[pc + 1] & 0b00111000) >> 3
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             // Find out if that bit is set
             
@@ -1590,13 +1623,13 @@ class CPU {
             
             let bit = (memory[pc + 1] & 0b00111000) >> 3
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             // Generate our mask without that bit in it
             
             let mask = 0xFF as UInt8 - (1 << bit)
             
-            setCorrectDestination(memory[pc + 1], value: value & mask)
+            setCorrectDestination(op, value: value & mask)
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1608,13 +1641,13 @@ class CPU {
             
             // Which bit we want is in bits 5-3 of the opcode, so we'll extract it
             
-            let bit = (memory[pc + 1] & 0b00111000) >> 3
+            let bit = (op & 0b00111000) >> 3
             
-            let (value, memoryUsed) = getCorrectSource(memory[pc + 1])
+            let (value, memoryUsed) = getCorrectSource(op)
             
             // Set that bit in the value and put it back where it came from
             
-            setCorrectDestination(memory[pc + 1], value: value | (1 << bit))
+            setCorrectDestination(op, value: value | (1 << bit))
             
             if memoryUsed {
                 return (pc + 2, 4)
@@ -1623,7 +1656,7 @@ class CPU {
             }
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
-            fatalError("Unable to find a case for instruction 0xCB\(toHex(memory[pc &+ 1]))!");
+            fatalError("Unable to find a case for instruction 0xCB\(toHex(op))!");
         }
     }
     

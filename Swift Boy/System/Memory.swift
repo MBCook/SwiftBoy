@@ -40,7 +40,12 @@ class Memory {
                 
                 print(String(cString: [memory[0xFF01], 0x00]), terminator: "")
             } else {
-                memory[Int(index)] = value
+                switch index {
+                case SpecialLocations.divRegister.rawValue:
+                    memory[Int(index)] = 0x00   // Any write clears this register
+                default:
+                    memory[Int(index)] = value
+                }
             }
         }
     }
