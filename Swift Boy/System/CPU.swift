@@ -145,14 +145,23 @@ class CPU {
             // Fetch the current op
             
             if GAMEBOY_DOCTOR {
-                try! logFile!.write(contentsOf: generateLogLine().data(using: .utf8)!)
+                do {
+                    try logFile!.write(contentsOf: generateLogLine().data(using: .utf8)!)
+                    
+//                    if instructionCount % 1000 == 0 {
+//                        try logFile!.synchronize()
+//                    }
+                } catch {
+                    print("Error writing to log file! \(error.localizedDescription)")
+                    exit(1)
+                }
             }
             
             instructionCount = instructionCount &+ 1
             
-//            if instructionCount % 10000 == 0 {
+            if instructionCount % 50000 == 0 {
 //                print(numberFormatter.string(from: NSNumber(integerLiteral: Int(instructionCount)))!)
-//            }
+            }
             
             let op = memory[pc]
             
@@ -170,7 +179,16 @@ class CPU {
                     pc = pc + 0         // To shut Xcode up
                 }
                 
+                let oldA = a
+                let oldB = b
+                let oldC = c
+                
                 let (newPC, _) = try executeOpcode(op)
+                
+                if oldA != a && oldB != b && oldC != c {
+                    print("Instruction 0x\(toHex(op)) at PC 0x\(toHex(pc)) changed too many registers. Instruction #\(instructionCount).")
+                    exit(2)
+                }
                 
                 // Update the program counter, we'll ignore the cycles for now
                 
@@ -297,14 +315,14 @@ class CPU {
         let low = UInt8(value & 0x00FF)
         let high = UInt8((value & 0xFF00) >> 8)
         
-        memory[sp - 1] = low
-        memory[sp - 2] = high
+        memory[sp - 1] = high
+        memory[sp - 2] = low
         
         sp = sp - 2
     }
     
     private func pop() -> UInt16 {
-        let value = UInt16(memory[sp]) << 8 + UInt16(memory[sp + 1])
+        let value = UInt16(memory[sp]) + UInt16(memory[sp + 1]) << 8
         
         sp = sp + 2
         
@@ -312,9 +330,9 @@ class CPU {
     }
     
     private func resetVector(_ index: UInt8) -> (Address, Cycles) {
-        push(pc)
+        push(pc + 1)
         
-        return (UInt16(memory[UInt16(index) * 8]), 4)
+        return (UInt16(index) * 8, 4)
     }
     
     // MARK: - Helper functions that let us generalize op-codes and pass in the registers
@@ -380,14 +398,7 @@ class CPU {
         if getFlag(flag) == !negate {
             // The flag is set to the right value, perform a return
             
-            let high = UInt16(memory[sp])       // This is backwards for some reason from what readWord does
-            let low = UInt16(memory[sp + 1])
-            
-            let address = high << 8 + low
-            
-            sp = sp + 2
-
-            return (address, 5)
+            return (pop(), 5)
         } else {
             // The flag was the wrong value, keep going without a return
             
@@ -589,6 +600,8 @@ class CPU {
             // LD DE, d16
             
             de = readWord(pc + 1)
+            
+            
             
             return (pc + 3, 3)
         case 0x12:
@@ -1164,7 +1177,7 @@ class CPU {
         case 0xD4:
             // CALL NC, a16
             
-            return callOnFlag(.carry, negate: false)
+            return callOnFlag(.carry, negate: true)
         case 0xD5:
             // PUSH DE
             
