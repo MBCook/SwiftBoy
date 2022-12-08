@@ -23,14 +23,16 @@ class SwiftBoy {
     private var cpu: CPU
     private var memory: Memory
     private var timer: Timer
+    private var interruptController: InterruptController
     private var halted: Bool
     
     private var logFile: FileHandle?
     
     init(romLocation: URL) throws {
         timer = Timer()
-        memory = try Memory(romLocation: romLocation, timer: timer)
-        cpu = CPU(memory: memory)
+        interruptController = InterruptController()
+        memory = try Memory(romLocation: romLocation, timer: timer, interruptController: interruptController)
+        cpu = CPU(memory: memory, interruptController: interruptController)
 
         halted = false
     }
@@ -64,11 +66,13 @@ class SwiftBoy {
             // First update the timer
             
             // TODO: This
-//            let timerInterrupt = timer.tick(ticksUsed)
+            let timerInterrupt = timer.tick(ticksUsed)
             
             // If the timer wants an interrupt, trigger it
             
-            // TODO: This
+            if let timerInterrupt {
+                interruptController.raiseInterrupt(timerInterrupt)
+            }
             
             // Print some debug stuff if in Gameboy Doctor mode
             

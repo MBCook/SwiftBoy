@@ -75,10 +75,9 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    private var interruptsMasterEnabledBefore: Bool // Were the interrupts enabled before the current ISR?
-    private var interruptsMasterEnabled: Bool       // Are interrupts enabled globally?
     private var halted: Bool                        // If the CPU is waiting for an interrupt
     private let memory: Memory                      // Represents all memory, knows the special addressing rules so we don't have to
+    private let interruptController: InterruptController    // So we can handle interrupts
     private var ticks: UInt16                       // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
     
     private let HALT_OPCODE = 0x76
@@ -86,7 +85,7 @@ class CPU {
     // MARK: - Public interface
     
     // Init sets everything to the values expected once the startup sequence finishes running
-    init(memory: Memory) {
+    init(memory: Memory, interruptController: InterruptController) {
         // You can find the default values in many places, https://bgb.bircd.org/pandocs.htm#powerupsequence holds a nice summary
         a = 0x01
         b = 0x00
@@ -102,10 +101,8 @@ class CPU {
         
         ticks = 0
         
-        interruptsMasterEnabledBefore = false
-        interruptsMasterEnabled = false
-        
         self.memory = memory
+        self.interruptController = interruptController
         
         memory[MemoryLocations.interruptEnable.rawValue] = 0x00
         memory[MemoryLocations.interruptFlags.rawValue] = 0x00
@@ -114,6 +111,20 @@ class CPU {
     // Runs one instruction, returns how many ticks have passed and if we are now halted
     func executeInstruction() throws -> (Ticks, Bool) {
         var ticksUsed: Cycles = 0
+        
+        // First, do we need to service an interrupt?
+        
+        if let vector = interruptController.handleNextInterrupt() {
+            // We're handling an interrupt. Put PC on the stack and then call into the vector we were given
+            
+            push(pc)
+            
+            pc = vector
+            
+            print("Interrupt vector 0x\(toHex(vector)) needs servicing.")
+            
+            return (5, false)   // It takes 5 ticks to setup an interrupt
+        }
         
         // Validate the PC is sane, fetch the next opcode if so
         
@@ -1116,7 +1127,7 @@ class CPU {
         case 0xD9:
             // RETI
             
-            interruptsMasterEnabled = interruptsMasterEnabledBefore
+            interruptController.enableInterrupts()
             
             return (pop(), 4)
         case 0xDA:
@@ -1262,7 +1273,7 @@ class CPU {
         case 0xF3:
             // DI
             
-            interruptsMasterEnabled = false
+            interruptController.disableInterrupts()
             
             return (pc + 1, 1)
         case 0xF4:
@@ -1316,7 +1327,7 @@ class CPU {
         case 0xFB:
             // EI
             
-            interruptsMasterEnabled = true
+            interruptController.enableInterrupts()
             
             return (pc + 1, 1)
         case 0xFC:

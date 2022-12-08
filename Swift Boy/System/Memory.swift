@@ -27,13 +27,15 @@ class Memory {
     private var memory: Data // [UInt8] = Array.init(repeating: 0x00, count: 0xFFFF)
     
     // We also need some other objects we'll redirect memory access to
-    private var timerDevice: MemoryMappedDevice
+    private var timer: MemoryMappedDevice
+    private var interruptController: InterruptController
     
-    init(romLocation: URL, timer: Timer) throws {
+    init(romLocation: URL, timer: Timer, interruptController: InterruptController) throws {
         memory = try Data(contentsOf: romLocation)
         memory.append(contentsOf: Array.init(repeating: 0x00, count: 0xFFFF - memory.count + 1))
         
-        timerDevice = timer
+        self.timer = timer
+        self.interruptController = interruptController
     }
     
     subscript(index: UInt16) -> UInt8 {
@@ -45,7 +47,9 @@ class Memory {
                 // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
                 return 0x90
             case MemoryLocations.timerRangeStart.rawValue...MemoryLocations.timerRangeEnd.rawValue:
-                return timerDevice.readRegister(index)
+                return timer.readRegister(index)
+            case MemoryLocations.interruptEnable.rawValue, MemoryLocations.interruptFlags.rawValue:
+                return interruptController.readRegister(index)
             default:
                 return memory[Int(index)]
             }
@@ -61,7 +65,9 @@ class Memory {
             } else {
                 switch index {
                 case MemoryLocations.timerRangeStart.rawValue...MemoryLocations.timerRangeEnd.rawValue:
-                    return timerDevice.writeRegister(index, value)
+                    return timer.writeRegister(index, value)
+                case MemoryLocations.interruptEnable.rawValue, MemoryLocations.interruptFlags.rawValue:
+                    interruptController.writeRegister(index, value)
                 default:
                     memory[Int(index)] = value
                 }

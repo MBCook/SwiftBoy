@@ -60,7 +60,7 @@ class Timer: MemoryMappedDevice {
     func tick(_ ticks: Ticks) -> InterruptSource? {
         // Handle ticks of the clock
         
-        if stopMode {
+        guard !stopMode else {
             // Don't do anything in stop mode
             
             return nil
@@ -75,12 +75,12 @@ class Timer: MemoryMappedDevice {
             
             divRegister &+= 1       // Register needs to be able to wrap around
             
-            lastDivRegisterIncrement = lastDivRegisterIncrement % 64    // Don't forget any extra if the last instruction took too long
+            lastDivRegisterIncrement %= 64      // Don't forget any extra if the last instruction took too long
         }
         
         // Do we need to update the timer? Only if the time enable bit is on
         
-        if timerControl & TimerControlBits.enabled.rawValue == 0 {
+        guard timerControl & TimerControlBits.enabled.rawValue != 0 else {
             // Timer is off, do nothing
             
             return nil
@@ -108,21 +108,23 @@ class Timer: MemoryMappedDevice {
         
         lastTimerRegisterIncrement = lastTimerRegisterIncrement + UInt16(ticks)
         
-        var raiseInterrupt = false
-        
         if lastTimerRegisterIncrement > divisor {
             // Time to increment the timer, be prepared for an overflow
             
             if timerCounter == 0xFF {       // Time to reset
-                raiseInterrupt = true
+                // We need to raise an interrput (0xFF + 1 would have rolled over)
+                print("Timer interrupt!")
                 
-                timerCounter = timerModulo  // Rest the counter to the modulo value
+                timerCounter = timerModulo      // Resert the timer to the modulo value
+                lastTimerRegisterIncrement = 0  // Start the counting intervals from 0 again
+                
+                return InterruptSource.timer
             } else {
                 timerCounter += 1
             }
         }
         
-        return raiseInterrupt ? InterruptSource.timer : nil
+        return nil
     }
     
     // MARK: - MemoryMappedDevice protocol functions
@@ -154,7 +156,7 @@ class Timer: MemoryMappedDevice {
         case TIMER_CONTROL_REGISTER:
             timerControl = value
         default:
-            fatalError("The timer should not have been asked for memory address 0x\(toHex(address))")
+            fatalError("The timer should not have been asked to set memory address 0x\(toHex(address))")
         }
     }
 }

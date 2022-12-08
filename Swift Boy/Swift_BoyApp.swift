@@ -19,8 +19,8 @@ struct Swift_BoyApp: App {
     static func main() {
         // The file we want to load
         
-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/01-special.gb")
-//x        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/02-interrupts.gb")
+//x        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/01-special.gb")
+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/02-interrupts.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/03-op sp,hl.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/04-op r,imm.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/05-op rp.gb")
