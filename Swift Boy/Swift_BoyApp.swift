@@ -34,15 +34,11 @@ struct Swift_BoyApp: App {
         // Create memory with that rom
         
         do {
-            let memory = try Memory(romLocation: romURL)
+            let swiftBoy = try SwiftBoy(romLocation: romURL)
             
-            // Create a CPU
-            
-            let cpu = CPU(memory: memory)
-            
-            cpu.run()
+            swiftBoy.run()
         } catch {
-            print("Error occured: \(error.localizedDescription)")
+            fatalError("Error initializing things: \(error.localizedDescription)")
         }
     }
 }

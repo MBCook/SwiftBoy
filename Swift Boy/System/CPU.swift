@@ -7,36 +7,11 @@
 
 import Foundation
 
-enum Flags: UInt8 {
-    case zero = 0b10000000
-    case subtraction = 0b01000000
-    case halfCarry = 0b00100000
-    case carry = 0b00010000
-}
-
-enum Interrupts: UInt8 {
-    case vblank = 0b00000001
-    case lcdStat = 0b00000010
-    case timer = 0b00000100
-    case serial = 0b00001000
-    case joypad = 0b00010000
-}
-
-typealias Address = UInt16
-typealias Cycles = UInt8
-typealias Register = UInt8
-typealias RegisterPair = UInt16
-
-enum SpecialLocations: Address {
-    case joypad = 0xFF00
-    
-    case divRegister = 0xFF04
-    case timeCounter = 0xFF05
-    case timeModulo = 0xFF06
-    case timerControl = 0xFF07
-    
-    case interruptFlags = 0xFF0F
-    case interruptEnable = 0xFFFF
+enum Flags: Bitmask {
+    case zero = 0x80
+    case subtraction = 0x40
+    case halfCarry = 0x20
+    case carry = 0x10
 }
 
 enum CPUErrors: Error {
@@ -102,11 +77,11 @@ class CPU {
     
     private var interruptsMasterEnabledBefore: Bool // Were the interrupts enabled before the current ISR?
     private var interruptsMasterEnabled: Bool       // Are interrupts enabled globally?
-    private var halted: Bool                        // If the CPU is wiaitng for an interrupt
+    private var halted: Bool                        // If the CPU is waiting for an interrupt
     private let memory: Memory                      // Represents all memory, knows the special addressing rules so we don't have to
     private var ticks: UInt16                       // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
-    private var lastDiv: UInt16                     // The last time the DIV register was incremented
-    private var timerCounter: UInt16                // The last time the counter was incremented
+    
+    private let HALT_OPCODE = 0x76
     
     // MARK: - Public interface
     
@@ -126,119 +101,45 @@ class CPU {
         halted = false
         
         ticks = 0
-        lastDiv = 0
-        timerCounter = 0
         
         interruptsMasterEnabledBefore = false
         interruptsMasterEnabled = false
         
         self.memory = memory
         
-        memory[SpecialLocations.timeCounter.rawValue] = 0x00
-        memory[SpecialLocations.timeModulo.rawValue] = 0x00
-        memory[SpecialLocations.timerControl.rawValue] = 0x00
-        
-        memory[SpecialLocations.interruptEnable.rawValue] = 0x00
-        memory[SpecialLocations.interruptFlags.rawValue] = 0x00
+        memory[MemoryLocations.interruptEnable.rawValue] = 0x00
+        memory[MemoryLocations.interruptFlags.rawValue] = 0x00
     }
     
-    // The main loop that runs the CPU
-    func run() {
-        var instructionCount: UInt = 0
-        
-        var logFile: FileHandle?
-        
-        defer {
-            if logFile != nil {
-                try! logFile!.close()
-            }
-        }
-        
-        if GAMEBOY_DOCTOR {
-            let path = "/Users/michael/Downloads/gameboy-doctor-master/myrun.txt";
-            
-            logFile = FileHandle(forWritingAtPath: path)
-        }
-        
-        print("Starting")
-        
-        let numberFormatter = NumberFormatter()
-        numberFormatter.numberStyle = .decimal
-        
+    // Runs one instruction, returns how many ticks have passed and if we are now halted
+    func executeInstruction() throws -> (Ticks, Bool) {
         var ticksUsed: Cycles = 0
         
-        while !halted {
-            // Do useful stuff to us
-            
-            if GAMEBOY_DOCTOR {
-                do {
-                    try logFile!.write(contentsOf: generateLogLine().data(using: .utf8)!)
-                    
-//                    if instructionCount % 1000 == 0 {
-//                        try logFile!.synchronize()
-//                    }
-                } catch {
-                    print("Error writing to log file! \(error.localizedDescription)")
-                    exit(1)
-                }
-            }
-            
-            instructionCount = instructionCount &+ 1
-            
-            if instructionCount % 50000 == 0 {
-//                print(numberFormatter.string(from: NSNumber(integerLiteral: Int(instructionCount)))!)
-            }
-            
-            // Update the various timers if necessary
-            
-            handleTimerTicks(ticksUsed)
-            
-            // Handle interrups
-            
-            // TODO: This
-            
-            // Handle the next instruction
-            
-            let op = memory[pc]
-            
-            do {
-                switch pc {
-                case 0x8000...0x9FFF,   // Video RAM
-                    0xE000...0xFDFF,    // Echo RAM, Nintendo prohibited
-                    0xFE00...0xFE9F,    // OAM memory
-                    0xFEA0...0xFEFF,    // Nintendo prohibited
-                    0xFFFF:             // Interrupt enable register
-                    throw CPUErrors.BadAddressForOpcode(pc);    // Shouldn't be here, so throw an error
-                default:
-                    pc = pc + 0         // To shut Xcode up
-                }
-                
-                // Run the operation, updating the program counter and the number of ticks that were used
-                
-                (pc, ticksUsed) = try executeOpcode(op)
-            } catch CPUErrors.InvalidInstruction(let op) {
-                print("Invalid instruction: \(toHex(op))")
-                
-                return
-            } catch CPUErrors.BadAddressForOpcode(let address) {
-                print("Invalid address for PC: \(toHex(address))")
-                
-                return
-            } catch CPUErrors.Stopped {
-                print("CPU stopped by instruction")
-                
-                return
-            } catch {
-                print("An unknown error occurred: \(error.localizedDescription)")
-                
-                return
-            }
+        // Validate the PC is sane, fetch the next opcode if so
+        
+        let op: UInt8
+        
+        switch pc {
+        case 0x8000...0x9FFF,   // Video RAM
+            0xE000...0xFDFF,    // Echo RAM, Nintendo prohibited
+            0xFE00...0xFE9F,    // OAM memory
+            0xFEA0...0xFEFF,    // Nintendo prohibited
+            0xFFFF:             // Interrupt enable register
+            throw CPUErrors.BadAddressForOpcode(pc);    // Shouldn't be here, so throw an error
+        default:
+            op = memory[pc]
         }
+        
+        // Run the operation, updating the program counter and the number of ticks that were used
+            
+        (pc, ticksUsed) = try executeOpcode(op)
+        
+        // Inform our caller
+        
+        return (ticksUsed, op == HALT_OPCODE)
     }
     
-    // MARK: - Private helper functions
-    
-    private func generateLogLine() -> String {
+    func generateDebugLogLine() -> String {
         // Write a log line like this:
         //
         // A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
@@ -250,13 +151,7 @@ class CPU {
               "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))\n"
     }
     
-    private func toHex(_ value: UInt8) -> String {
-        return String(format: "%02X", value)
-    }
-    
-    private func toHex(_ value: UInt16) -> String {
-        return String(format: "%04X", value)
-    }
+    // MARK: - Private helper functions
     
     private func getFlag(_ flag: Flags) -> Bool {
         return flags & flag.rawValue > 0
@@ -311,14 +206,6 @@ class CPU {
         return Int(a & 0x0FFF) - Int(b & 0x0FFF) < 0
     }
     
-    private func twosCompliment(_ value: UInt8) -> UInt8 {
-        return (value ^ 0xFF) &+ 1
-    }
-    
-    private func twosCompliment(_ value: UInt16) -> UInt16 {
-        return (value ^ 0xFFFF) &+ 1
-    }
-    
     private func readWord(_ address: Address) -> UInt16 {
         let low = UInt16(memory[address])
         let high = UInt16(memory[address + 1])
@@ -345,14 +232,14 @@ class CPU {
     }
     
     private func pop() -> UInt16 {
-        let value = UInt16(memory[sp]) + UInt16(memory[sp + 1]) << 8
-        
+        let value = readWord(sp)
+
         sp = sp + 2
         
         return value
     }
     
-    private func resetVector(_ index: UInt8) -> (Address, Cycles) {
+    private func triggerResetVector(_ index: UInt8) -> (Address, Cycles) {
         push(pc + 1)
         
         return (UInt16(index) * 8, 4)
@@ -367,7 +254,7 @@ class CPU {
     private func incrementRegister(_ register: inout Register) {
         let old = register
         
-        register = register &+ 1
+        register &+= 1
         
         setFlags(zero: register == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(old, 1), carry: nil)
     }
@@ -375,7 +262,7 @@ class CPU {
     private func decrementRegister(_ register: inout Register) {
         let old = register
         
-        register = register &- 1
+        register &-= 1
         
         setFlags(zero: register == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(old, 1), carry: nil)
     }
@@ -384,7 +271,7 @@ class CPU {
         let halfCarry = checkWordHalfCarryAdd(register, amount)
         let oldRegister = register
         
-        register = register &+ amount
+        register &+= amount
         
         setFlags(zero: nil, subtraction: false, halfCarry: halfCarry, carry: oldRegister > register)
     }
@@ -515,16 +402,6 @@ class CPU {
         return result
     }
     
-    // MARK: - Interrupt servicing
-    
-    private func handleTimerTicks(_ ticks: UInt8) {
-        // TODO: This
-        
-        // Need to keep track of stop vs halt
-        // Stop kills everything until joypad input, then picks up where it left off
-        // Halt stops running new instructions but timers keep going waiting for an interrupt
-    }
-    
     // MARK: - Opcode dispatch
     
     // Runs the opcode at PC, returns the new value for PC and how many cycles were used (divided by four)
@@ -550,7 +427,7 @@ class CPU {
         case 0x03:
             // INC BC
             
-            bc = bc &+ 1
+            bc &+= 1
             
             return (pc + 1, 2)
         case 0x04:
@@ -600,7 +477,7 @@ class CPU {
         case 0x0B:
             // DEC BC
             
-            bc = bc &- 1
+            bc &-= 1
             
             return (pc + 1, 2)
         case 0x0C:
@@ -646,7 +523,7 @@ class CPU {
         case 0x13:
             // INC DE
             
-            de = de &+ 1
+            de &+= 1
             
             return (pc + 1, 2)
         case 0x14:
@@ -692,7 +569,7 @@ class CPU {
         case 0x1B:
             // DEC DE
             
-            de = de &- 1
+            de &-= 1
             
             return (pc + 1, 2)
         case 0x1C:
@@ -736,13 +613,13 @@ class CPU {
             
             memory[hl] = a
             
-            hl = hl &+ 1
+            hl &+= 1
             
             return (pc + 1, 2)
         case 0x23:
             // INC HL
             
-            hl = hl &+ 1
+            hl &+= 1
             
             return (pc + 1, 2)
         case 0x24:
@@ -774,22 +651,22 @@ class CPU {
                 // Adjust things if a carry of some kind occured or there is an out of bounds condition
                 
                 if getFlag(.carry) || a > 0x99 {
-                    a = a &+ 0x60
+                    a &+= 0x60
                     setFlagBit(.carry)
                 }
                 
                 if getFlag(.halfCarry) || (a & 0x0F) > 0x09 {
-                    a = a &+ 0x06
+                    a &+= 0x06
                 }
             } else {
                 // After subtraction only adjust if there was a carry of some kind
                 
                 if getFlag(.carry) {
-                    a = a &- 0x60
+                    a &-= 0x60
                 }
                 
                 if getFlag(.halfCarry) {
-                    a = a &- 0x06
+                    a &-= 0x06
                 }
             }
             
@@ -812,13 +689,13 @@ class CPU {
             
             a = memory[hl]
             
-            hl = hl &+ 1
+            hl &+= 1
             
             return (pc + 1, 2)
         case 0x2B:
             // DEC HL
             
-            hl = hl &- 1
+            hl &-= 1
             
             return (pc + 1, 2)
         case 0x2C:
@@ -862,13 +739,13 @@ class CPU {
             
             memory[hl] = a
             
-            hl = hl &- 1
+            hl &-= 1
             
             return (pc + 1, 2)
         case 0x33:
             // INC SP
             
-            sp = sp &+ 1
+            sp &+= 1
             
             return (pc + 1, 2)
         case 0x34:
@@ -876,7 +753,7 @@ class CPU {
             
             let old = memory[hl]
             
-            memory[hl] = memory[hl] &+ 1
+            memory[hl] &+= 1
             
             setFlags(zero: memory[hl] == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(old, 1), carry: nil)
             
@@ -886,7 +763,7 @@ class CPU {
             
             let old = memory[hl]
             
-            memory[hl] = memory[hl] &- 1
+            memory[hl] &-= 1
             
             setFlags(zero: memory[hl] == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(old, 1), carry: nil)
             
@@ -918,13 +795,13 @@ class CPU {
             
             a = memory[hl]
             
-            hl = hl &- 1
+            hl &-= 1
             
             return (pc + 1, 2)
         case 0x3B:
             // DEC SP
             
-            sp = sp &- 1
+            sp &-= 1
             
             return (pc + 1, 2)
         case 0x3C:
@@ -953,9 +830,8 @@ class CPU {
             return (pc + 1, 1)
         case 0x76:
             // Note: This is the one exception in the interval below.
-            // So we'll handle it here to exclude it even though that's out of order
-            
-            halted = true
+            // Code in the executeInstruction function will have noticed this was the op and handle it appropriately
+            // So for this code here it looks like a nop, though it does perform a function elsewhere
             
             return (pc + 1, 1)
         case 0x40...0x7F:
@@ -971,7 +847,7 @@ class CPU {
             let (source, memoryUsed) = getCorrectSource(op)
             let oldA = a
             
-            a = a &+ source
+            a &+= source
             
             // Carry is set if we wrapped around (oldA > a)
             setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, source), carry: oldA > a)
@@ -990,7 +866,7 @@ class CPU {
             let subtotal = source &+ extra
             let oldA = a
             
-            a = a &+ subtotal
+            a &+= subtotal
             
             // There are two carry possibilities
             let carry = (oldA &+ source < oldA) || (oldA &+ subtotal < oldA &+ source)
@@ -1009,7 +885,7 @@ class CPU {
             
             let oldA = a
             
-            a = a &- source
+            a &-= source
             
             // Carry is set if the value subtracted from A was bigger than A
             setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: source > oldA)
@@ -1029,7 +905,7 @@ class CPU {
             
             let oldA = a
 
-            a = a &- subtotal
+            a &-= subtotal
             
             let halfCarry = checkByteHalfCarrySubtract(oldA, source, carry: extra == 1)
             
@@ -1132,7 +1008,7 @@ class CPU {
             
             let oldA = a
             
-            a = a &+ memory[pc + 1]
+            a &+= memory[pc + 1]
             
             // Carry is set if we wrapped around (oldA > a)
             setFlags(zero: a == 0, subtraction: false, halfCarry: checkByteHalfCarryAdd(oldA, memory[pc + 1]), carry: oldA > a)
@@ -1141,7 +1017,7 @@ class CPU {
         case 0xC7:
             // RST 0
             
-            return resetVector(0)
+            return triggerResetVector(0)
         case 0xC8:
             // RET Z
             
@@ -1177,7 +1053,7 @@ class CPU {
             let subtotal = source &+ extra
             let oldA = a
             
-            a = a &+ subtotal
+            a &+= subtotal
             
             let halfCarry = checkByteHalfCarryAdd(oldA, source, carry: extra == 1)
             
@@ -1190,7 +1066,7 @@ class CPU {
         case 0xCF:
             // RST 1
             
-            return resetVector(1)
+            return triggerResetVector(1)
         case 0xD0:
             // RET NC
             
@@ -1223,7 +1099,7 @@ class CPU {
             let source = memory[pc + 1]
             let oldA = a
             
-            a = a &- source
+            a &-= source
             
             // Carry is set if we subtracted more than was there (oldA < source)
             setFlags(zero: a == 0, subtraction: true, halfCarry: checkByteHalfCarrySubtract(oldA, source), carry: oldA < source)
@@ -1232,7 +1108,7 @@ class CPU {
         case 0xD7:
             // RST 2
             
-            return resetVector(2)
+            return triggerResetVector(2)
         case 0xD8:
             // RET C
             
@@ -1263,7 +1139,7 @@ class CPU {
             let subtotal = source &+ extra  // Plus because we want to subtract MORE below
             let oldA = a
             
-            a = a &- subtotal
+            a &-= subtotal
             
             let halfCarry = checkByteHalfCarrySubtract(oldA, source, carry: extra == 1)
             
@@ -1276,7 +1152,7 @@ class CPU {
         case 0xDF:
             // RST 3
             
-            return resetVector(3)
+            return triggerResetVector(3)
         case 0xE0:
             // LD (a8), A
             
@@ -1316,14 +1192,14 @@ class CPU {
         case 0xE7:
             // RST 4
             
-            return resetVector(4)
+            return triggerResetVector(4)
         case 0xE8:
             // ADD SP, s8
             
             let signedValue = UInt16(bitPattern: Int16(Int8(bitPattern: memory[pc + 1])))
             let oldSP = sp
             
-            sp = sp &+ signedValue
+            sp &+= signedValue
             
             // All flags are based on the lower byte, as if we were doing an 8 bit addition
             
@@ -1362,7 +1238,7 @@ class CPU {
         case 0xEF:
             // RST 5
             
-            return resetVector(5)
+            return triggerResetVector(5)
         case 0xF0:
             // LD A, (d8)
             
@@ -1408,7 +1284,7 @@ class CPU {
         case 0xF7:
             // RST 6
             
-            return resetVector(6)
+            return triggerResetVector(6)
         case 0xF8:
             // LD HL, SP + s8
             
@@ -1459,7 +1335,7 @@ class CPU {
         case 0xFF:
             // RST 7
             
-            return resetVector(7)
+            return triggerResetVector(7)
         default:
             // Xcode can't seem to figure out we have all possible cases of a UInt8
             fatalError("Unable to find a case for instruction 0x\(toHex(op))!");

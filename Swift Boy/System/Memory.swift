@@ -7,27 +7,46 @@
 
 import Foundation
 
+enum MemoryLocations: Address {
+    case joypad = 0xFF00
+    
+    case timerRangeStart = 0xFF04
+    case timerRangeEnd = 0xFF07
+    
+    case interruptFlags = 0xFF0F
+    case interruptEnable = 0xFFFF
+}
+
+protocol MemoryMappedDevice {
+    func readRegister(_ address: Address) -> UInt8
+    func writeRegister(_ address: Address, _ value: UInt8)
+}
+
 class Memory {
     // For now we'll just allocate the full address space and start it at 0x00
-    var memory: Data // [UInt8] = Array.init(repeating: 0x00, count: 0xFFFF)
+    private var memory: Data // [UInt8] = Array.init(repeating: 0x00, count: 0xFFFF)
     
-    init() {
-        memory = Data(count: 0xFFFF)
-    }
+    // We also need some other objects we'll redirect memory access to
+    private var timerDevice: MemoryMappedDevice
     
-    init(romLocation: URL) throws {
+    init(romLocation: URL, timer: Timer) throws {
         memory = try Data(contentsOf: romLocation)
         memory.append(contentsOf: Array.init(repeating: 0x00, count: 0xFFFF - memory.count + 1))
+        
+        timerDevice = timer
     }
     
     subscript(index: UInt16) -> UInt8 {
         get {
             // These will get more complicated later
             
-            if GAMEBOY_DOCTOR && index == 0xFF44 {
+            switch index {
+            case 0xFF44 where GAMEBOY_DOCTOR:
                 // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
                 return 0x90
-            } else {
+            case MemoryLocations.timerRangeStart.rawValue...MemoryLocations.timerRangeEnd.rawValue:
+                return timerDevice.readRegister(index)
+            default:
                 return memory[Int(index)]
             }
         }
@@ -41,8 +60,8 @@ class Memory {
                 print(String(cString: [memory[0xFF01], 0x00]), terminator: "")
             } else {
                 switch index {
-                case SpecialLocations.divRegister.rawValue:
-                    memory[Int(index)] = 0x00   // Any write clears this register
+                case MemoryLocations.timerRangeStart.rawValue...MemoryLocations.timerRangeEnd.rawValue:
+                    return timerDevice.writeRegister(index, value)
                 default:
                     memory[Int(index)] = value
                 }
