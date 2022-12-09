@@ -24,7 +24,6 @@ class SwiftBoy {
     private var memory: Memory
     private var timer: Timer
     private var interruptController: InterruptController
-    private var halted: Bool
     
     private var logFile: FileHandle?
     
@@ -33,8 +32,6 @@ class SwiftBoy {
         interruptController = InterruptController()
         memory = try Memory(romLocation: romLocation, timer: timer, interruptController: interruptController)
         cpu = CPU(memory: memory, interruptController: interruptController)
-
-        halted = false
     }
     
     // The main runloop
@@ -65,7 +62,6 @@ class SwiftBoy {
         while true {
             // First update the timer
             
-            // TODO: This
             let timerInterrupt = timer.tick(ticksUsed)
             
             // If the timer wants an interrupt, trigger it
@@ -85,16 +81,10 @@ class SwiftBoy {
                 }
             }
             
-            // If we're halted, we don't execute CPU instructions
-            
-            if halted {
-                continue;
-            }
-            
             // Ok then, we need to execute the next opcode
             
             do {
-                (ticksUsed, halted) = try cpu.executeInstruction()
+                ticksUsed = try cpu.executeInstruction()
             } catch CPUErrors.InvalidInstruction(let op) {
                 fatalError("Invalid instruction: \(toHex(op))")
             } catch CPUErrors.BadAddressForOpcode(let address) {

@@ -20,6 +20,13 @@ enum CPUErrors: Error {
     case Stopped
 }
 
+private enum HaltStatus {
+    case notHalted
+    case haltedInterruptsOn
+    case haltedInterruptsOff
+    case haltedInterruptsOffWithPending
+}
+
 class CPU {
     // MARK: - First our registers
     
@@ -75,12 +82,10 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    private var halted: Bool                        // If the CPU is waiting for an interrupt
+    private var haltStatus: HaltStatus              // If the CPU is waiting for an interrupt
     private let memory: Memory                      // Represents all memory, knows the special addressing rules so we don't have to
     private let interruptController: InterruptController    // So we can handle interrupts
     private var ticks: UInt16                       // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
-    
-    private let HALT_OPCODE = 0x76
     
     // MARK: - Public interface
     
@@ -97,33 +102,52 @@ class CPU {
         flags = 0xB0
         sp = 0xFFFE
         pc = 0x0100
-        halted = false
+        haltStatus = .notHalted
         
         ticks = 0
         
         self.memory = memory
         self.interruptController = interruptController
-        
-        memory[MemoryLocations.interruptEnable.rawValue] = 0x00
-        memory[MemoryLocations.interruptFlags.rawValue] = 0x00
     }
     
-    // Runs one instruction, returns how many ticks have passed and if we are now halted
-    func executeInstruction() throws -> (Ticks, Bool) {
+    // Runs one instruction, returns how many ticks have passed
+    func executeInstruction() throws -> Ticks {
         var ticksUsed: Cycles = 0
         
         // First, do we need to service an interrupt?
         
-        if let vector = interruptController.handleNextInterrupt() {
-            // We're handling an interrupt. Put PC on the stack and then call into the vector we were given
+        var haltBugTriggered = false
+        
+        if interruptController.interruptsPending() {
+            // There is a pending interrupt. What do we do? Depends on if we're halted and how it was called
             
-            push(pc)
-            
-            pc = vector
-            
-            print("Interrupt vector 0x\(toHex(vector)) needs servicing.")
-            
-            return (5, false)   // It takes 5 ticks to setup an interrupt
+            if (haltStatus == .notHalted && interruptController.interruptsEnabled()) || haltStatus == .haltedInterruptsOn {
+                // Do things the normal way. We weren't halted or we were but interrupts are on so it needs to be serviced
+                
+                let vector = interruptController.handleNextInterrupt()! // We know an interrupt is pending, so this is safe
+                
+                // We're handling an interrupt. Put PC on the stack and then call into the vector we were given
+                    
+                push(pc)
+                
+                pc = vector
+                
+                haltStatus = .notHalted
+                
+                return 5    // It takes 5 ticks to process an interrupt
+            } else if haltStatus == .haltedInterruptsOff {
+                // An interrupt is has occured, but interrupts are off. Wake up, but ignore the interrupt.
+                // We're just going to continue on as normal but leaving the halt state.
+                
+                haltStatus = .notHalted
+            } else if haltStatus == .haltedInterruptsOffWithPending {
+                // Ok, they halted with interrupts off but an interrupt already pending.
+                // This is like the above, but with the added fun of the 'halt bug'.
+                // We leave halt, but set it up so the instruction right after halt exectures TWICE.
+                
+                haltStatus = .notHalted
+                haltBugTriggered = true
+            }
         }
         
         // Validate the PC is sane, fetch the next opcode if so
@@ -143,11 +167,21 @@ class CPU {
         
         // Run the operation, updating the program counter and the number of ticks that were used
             
+        let lastPC = pc
+        
         (pc, ticksUsed) = try executeOpcode(op)
+        
+        // If we're executing under halt bug conditions, ignore the PC and reset it to the halt bug
+        
+        if haltBugTriggered {
+            // We need to re-execute the last instruction. Reset the PC to what it was at this start.
+            
+            pc = lastPC
+        }
         
         // Inform our caller
         
-        return (ticksUsed, op == HALT_OPCODE)
+        return ticksUsed
     }
     
     func generateDebugLogLine() -> String {
@@ -840,9 +874,17 @@ class CPU {
             
             return (pc + 1, 1)
         case 0x76:
-            // Note: This is the one exception in the interval below.
-            // Code in the executeInstruction function will have noticed this was the op and handle it appropriately
-            // So for this code here it looks like a nop, though it does perform a function elsewhere
+            // HALT
+            
+            // We need to track if global interrupts were on and if anything was pending when this instruction was run
+            
+            if interruptController.interruptsEnabled() {
+                haltStatus = .haltedInterruptsOn    // They're enabled, this is easy
+            } else if interruptController.interruptsPending() {
+                haltStatus = .haltedInterruptsOffWithPending
+            } else {
+                haltStatus = .haltedInterruptsOff
+            }
             
             return (pc + 1, 1)
         case 0x40...0x7F:

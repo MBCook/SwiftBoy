@@ -32,6 +32,16 @@ class InterruptController: MemoryMappedDevice {
         raisedInterrupts = 0x00
     }
     
+    // Are interrupts currently enabled?
+    func interruptsEnabled() -> Bool {
+        return globalEnable
+    }
+    
+    // Is an interrupt currently pending? Ignore global enabled/disabled for this
+    func interruptsPending() -> Bool {
+        return enabledInterrupts & raisedInterrupts > 0
+    }
+    
     // If an interrupt needs servicing, this marks things correclty and returns the address to jump to
     func handleNextInterrupt() -> Address? {
         guard globalEnable else {
@@ -52,8 +62,6 @@ class InterruptController: MemoryMappedDevice {
             if bit.rawValue & enabledInterrupts & raisedInterrupts > 0 {
                 // Found it! Clear the bit, then return the address of the interupt handler to jump to
                 
-                print("Interrupt \(bit) needs servicing.")
-                
                 raisedInterrupts -= bit.rawValue    // Clears the bit
                 globalEnable = false                // Disable interrupts while things are being serviced
                 
@@ -73,12 +81,10 @@ class InterruptController: MemoryMappedDevice {
     }
     
     func disableInterrupts() {
-        print("Disabling interrupts")
         globalEnable = false
     }
     
     func enableInterrupts() {
-        print("Enabling interrupts")
         globalEnable = true
     }
     

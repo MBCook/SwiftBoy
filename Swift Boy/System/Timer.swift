@@ -113,7 +113,6 @@ class Timer: MemoryMappedDevice {
             
             if timerCounter == 0xFF {       // Time to reset
                 // We need to raise an interrput (0xFF + 1 would have rolled over)
-                print("Timer interrupt!")
                 
                 timerCounter = timerModulo      // Resert the timer to the modulo value
                 lastTimerRegisterIncrement = 0  // Start the counting intervals from 0 again
