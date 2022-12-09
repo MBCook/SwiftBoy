@@ -602,7 +602,11 @@ class CPU {
         case 0x18:
             // JR s8
             
-            return (pc + UInt16(memory[pc + 1]) + 2, 3) // The + 2 is for the bytes of this instruction
+            let signedOffset = Int8(bitPattern: memory[pc + 1])
+            let signedOffsetExpanded = Int16(signedOffset)
+            let newPC = pc &+ UInt16(bitPattern: signedOffsetExpanded) &+ 2 // The 2 is for the size of this instruction (already 'done')
+            
+            return (newPC, 3)
         case 0x19:
             // ADD HL, DE
             
