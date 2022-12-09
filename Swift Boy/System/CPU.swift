@@ -148,6 +148,10 @@ class CPU {
                 haltStatus = .notHalted
                 haltBugTriggered = true
             }
+        } else if haltStatus != .notHalted {
+            // We're halted but nothing is pending, so nothing shoud happen
+            
+            return 1    // Mark one cycle just so everything keeps simulating and the timer can keep advancing
         }
         
         // Validate the PC is sane, fetch the next opcode if so
