@@ -29,9 +29,15 @@ enum MemoryLocations {
     
     static let ioRegisterStart: Address = 0xFF00
     
+    static let serialData: Address = 0xFF01
+    static let serialControl: Address = 0xFF02
     static let timerRegistersStart: Address = 0xFF04
     static let timerRegistersEnd: Address = 0xFF07
     static let interruptFlags: Address = 0xFF0F
+    
+    static let lcdRegisterStart: Address = 0xFF40
+    static let lcdYRegister: Address = 0xFF44
+    static let lcdRegisterEnd: Address = 0xFF4B
     
     static let ioRegisterEnd: Address = 0xFF7F
     
@@ -96,7 +102,7 @@ class Memory {
         get {
             // Quick debug test
             
-            if GAMEBOY_DOCTOR && index == 0xFF40 {
+            if GAMEBOY_DOCTOR && index == MemoryLocations.lcdYRegister {
                 // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
                 return 0x90
             }
@@ -133,11 +139,11 @@ class Memory {
         set(value) {
             // Quick debug test
             
-            if (BLARGG_TEST_ROMS || GAMEBOY_DOCTOR) && index == 0xFF02 && value == 0x81 {
+            if (BLARGG_TEST_ROMS || GAMEBOY_DOCTOR) && index == MemoryLocations.serialControl && value == 0x81 {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.
                 
-                print(String(cString: [ioRegisters[0xFF02 - Int(MemoryLocations.ioRegisterStart)], 0x00]), terminator: "")
+                print(String(cString: [ioRegisters[Int(MemoryLocations.serialData - MemoryLocations.ioRegisterStart)], 0x00]), terminator: "")
                 
                 return
             }

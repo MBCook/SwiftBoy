@@ -14,8 +14,8 @@ typealias Register = UInt8
 typealias RegisterPair = UInt16
 typealias Ticks = UInt8
 
-let GAMEBOY_DOCTOR = true
-let BLARGG_TEST_ROMS = false
+let GAMEBOY_DOCTOR = false
+let BLARGG_TEST_ROMS = true
 
 class SwiftBoy {
     // MARK: - Our private variables
@@ -49,10 +49,20 @@ class SwiftBoy {
         // Setup the log file if we're in Gameboy Doctor mode
         
         if GAMEBOY_DOCTOR {
-            let path = "/Users/michael/Downloads/gameboy-doctor-master/myrun.txt";
+            let path = "/Users/michael/Downloads/gameboy-doctor-master/myrun.txt"
+            
+            do {
+                if FileManager.default.fileExists(atPath: path) {
+                    try FileManager.default.removeItem(atPath: path)
+                }
+            } catch {
+                fatalError(error.localizedDescription)
+            }
+            
+            FileManager.default.createFile(atPath: path, contents: nil)
+                
             
             logFile = FileHandle(forWritingAtPath: path)
-                        
         }
         
         // Inform the populace!
