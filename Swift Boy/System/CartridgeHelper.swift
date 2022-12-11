@@ -47,22 +47,26 @@ class CartridgeHelper {
         
         print("\tHeader says type 0x\(toHex(type)), ROM: \(totalROM) bytes, RAM: \(totalRAM) bytes")
         
+        // Check that ROM size specificied matches the file we loaded
+        
+        guard totalROM == rom.count else {
+            throw CartridgeErrors.BadROMSize(expected: totalROM, found: UInt32(rom.count))
+        }
+        
         // Figure out what class hanles our cartridge type
         
         var cartridge: Cartridge.Type
         
         switch type {
-        case 0x00, 0x01:        // TODO: 0x01 is temporary
+        case 0x00:
             cartridge = NoMapper.self
+        case 0x01:
+            cartridge = MBC1.self
         default:
             throw CartridgeErrors.UnsupportedCartridgeType(type)
         }
         
-        // Check that cartridge type matches the RAM/ROM sizes specified
-        
-        guard totalROM == rom.count else {
-            throw CartridgeErrors.BadROMSize(expected: totalROM, found: UInt32(rom.count))
-        }
+        // Check with the mapper to see that the size is sane for that mapper
         
         try sanityCheckSizes(cartridge.sanityCheckSizes(romSize: totalROM, ramSize: totalRAM), romCode: romCode, ramCode: ramCode)
         

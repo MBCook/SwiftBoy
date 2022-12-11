@@ -7,42 +7,37 @@
 
 import Foundation
 
+let TWO_KB: UInt32 = 0x2000
 let EIGHT_KB: UInt32 = 0x2000
+let THIRTY_TWO_KB: UInt32 = 0x8000
+let ONE_MB: UInt32 = 0x100000
+let TWO_MB: UInt32 = 0x200000
+
+let ROM_BANK_MASK: Address = 0x3FFF  // The size of one ROM bank on the Game Boy for masking purposes
+let RAM_BANK_MASK: Address = 0x1FFF  // The size of one RAM bank on the Game Boy for masking purposes
 
 enum MemoryLocations {
-    static let romStart: Address = 0x0000
+    static let romRange: ClosedRange<Address> = 0x0000...0x7FFF
     static let romBankStart: Address = 0x4000
-    static let romEnd: Address = 0x7FFF
     
-    static let videoRAMStart: Address = 0x8000
-    static let videoRAMEnd: Address = 0x9FFF
+    static let videoRAMRange: ClosedRange<Address> = 0x8000...0x9FFF
     
-    static let externalRAMStart: Address = 0xA000
-    static let externalRAMBankStart: Address = 0xB000
-    static let externalRAMEnd: Address = 0xBFFF
+    static let externalRAMRange: ClosedRange<Address> = 0xA000...0xBFFF
     
-    static let workRAMStart: Address = 0xC000
-    static let workRAMEnd: Address = 0xDFFF
+    static let workRAMRange: ClosedRange<Address> = 0xC000...0xDFFF
     
-    static let objectAttributeMemoryStart: Address = 0xFE00
-    static let objectAttributeMemoryEnd: Address = 0xFE9F
+    static let objectAttributeMemoryRange: ClosedRange<Address> = 0xFE00...0xFE9F
     
-    static let ioRegisterStart: Address = 0xFF00
-    
+    static let ioRegisterRange: ClosedRange<Address> = 0xFF00...0xFF7F
     static let serialData: Address = 0xFF01
     static let serialControl: Address = 0xFF02
-    static let timerRegistersStart: Address = 0xFF04
-    static let timerRegistersEnd: Address = 0xFF07
+    static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07
     static let interruptFlags: Address = 0xFF0F
     
-    static let lcdRegisterStart: Address = 0xFF40
+    static let lcdRegisterRange: ClosedRange<Address> = 0xFF40...0xFF4B
     static let lcdYRegister: Address = 0xFF44
-    static let lcdRegisterEnd: Address = 0xFF4B
     
-    static let ioRegisterEnd: Address = 0xFF7F
-    
-    static let highRAMStart: Address = 0xFF80
-    static let highRAMEnd: Address = 0xFFFE
+    static let highRAMRange: ClosedRange<Address> = 0xFF80...0xFFFE
     
     static let interruptEnable: Address = 0xFFFF
 }
@@ -117,19 +112,19 @@ class Memory {
             case .rom:
                 return cartridge.readFromROM(index)
             case .videoRAM:
-                return videoRAM[Int(index - MemoryLocations.videoRAMStart)]
+                return videoRAM[Int(index - MemoryLocations.videoRAMRange.lowerBound)]
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
-                return workRAM[Int(index - MemoryLocations.workRAMStart)]
+                return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
             case .objectAttributeMemory:
-                return oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart)]
+                return oamRAM[Int(index - MemoryLocations.objectAttributeMemoryRange.lowerBound)]
             case .ioRegisters:
-                return ioRegisters[Int(index - MemoryLocations.ioRegisterStart)]
+                return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .timerRegisters:
                 return timer.readRegister(index)
             case .highRAM:
-                return highRAM[Int(index - MemoryLocations.highRAMStart)]
+                return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
             case .interruptEnable:
                 return interruptController.readRegister(index)
             default:
@@ -143,7 +138,8 @@ class Memory {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.
                 
-                print(String(cString: [ioRegisters[Int(MemoryLocations.serialData - MemoryLocations.ioRegisterStart)], 0x00]), terminator: "")
+                print(String(cString: [ioRegisters[Int(MemoryLocations.serialData - MemoryLocations.ioRegisterRange.lowerBound)],
+                                       0x00]), terminator: "")
                 
                 return
             }
@@ -158,19 +154,19 @@ class Memory {
             case .rom:
                 cartridge.writeToROM(index, value)
             case .videoRAM:
-                videoRAM[Int(index - MemoryLocations.videoRAMStart)] = value
+                videoRAM[Int(index - MemoryLocations.videoRAMRange.lowerBound)] = value
             case .externalRAM:
                 cartridge.writeToRAM(index, value)
             case .workRAM:
-                workRAM[Int(index - MemoryLocations.workRAMStart)] = value
+                workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
             case .objectAttributeMemory:
-                oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart)] = value
+                oamRAM[Int(index - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
             case .ioRegisters:
-                ioRegisters[Int(index - MemoryLocations.ioRegisterStart)] = value
+                ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
             case .timerRegisters:
                 timer.writeRegister(index, value)
             case .highRAM:
-                highRAM[Int(index - MemoryLocations.highRAMStart)] = value
+                highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptEnable:
                 interruptController.writeRegister(index, value)
             default:
@@ -184,21 +180,21 @@ class Memory {
     
     private func categorizeAddress(_ address: Address) -> MemorySection {
         switch address {
-        case MemoryLocations.romStart...MemoryLocations.romEnd:
+        case MemoryLocations.romRange:
             return .rom
-        case MemoryLocations.videoRAMStart...MemoryLocations.videoRAMEnd:
+        case MemoryLocations.videoRAMRange:
             return .videoRAM
-        case MemoryLocations.externalRAMStart...MemoryLocations.externalRAMStart:
+        case MemoryLocations.externalRAMRange:
             return .externalRAM
-        case MemoryLocations.workRAMStart...MemoryLocations.workRAMEnd:
+        case MemoryLocations.workRAMRange:
             return .workRAM
-        case MemoryLocations.objectAttributeMemoryStart...MemoryLocations.objectAttributeMemoryEnd:
+        case MemoryLocations.objectAttributeMemoryRange:
             return .objectAttributeMemory
-        case MemoryLocations.timerRegistersStart...MemoryLocations.timerRegistersEnd:
+        case MemoryLocations.timerRegistersRange:
             return .timerRegisters
-        case MemoryLocations.ioRegisterStart...MemoryLocations.ioRegisterEnd:
+        case MemoryLocations.ioRegisterRange:
             return .ioRegisters
-        case MemoryLocations.highRAMStart...MemoryLocations.highRAMEnd:
+        case MemoryLocations.highRAMRange:
             return .highRAM
         case MemoryLocations.interruptEnable:
             return .interruptEnable

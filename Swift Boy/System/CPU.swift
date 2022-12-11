@@ -17,7 +17,7 @@ enum Flags: Bitmask {
 enum CPUErrors: Error {
     case InvalidInstruction(_ opcode: UInt8)
     case BadAddressForOpcode(_ address: Address)
-    case Stopped
+    case Stopped(_ address: Address)
 }
 
 extension CPUErrors: LocalizedError {
@@ -27,8 +27,8 @@ extension CPUErrors: LocalizedError {
             return "Unsupported opcode found: 0x\(toHex(opcode))"
         case let .BadAddressForOpcode(address):
             return "No opcode should be at the PC address of 0x\(toHex(address))"
-        case .Stopped:
-            return "CPU stopped by instruction"
+        case let .Stopped(address):
+            return "CPU stopped by instruction at 0x\(toHex(address))"
         }
     }
 }
@@ -569,7 +569,7 @@ class CPU {
             
             return (pc + 1, 1)
         case 0x10:
-            throw CPUErrors.Stopped
+            throw CPUErrors.Stopped(pc)
         case 0x11:
             // LD DE, d16
             

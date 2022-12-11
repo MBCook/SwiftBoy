@@ -11,13 +11,13 @@ class NoMapper: Cartridge {
     // MARK: Our private data
     
     private var rom: Data       // The actual ROM data
-    private var ram: Data?      // If we have 8 Kb of RAM, it's here
+    private var ram: Data?      // If we have 8 KB of RAM, it's here
     
     // MARK: - Public properties
     
     var totalROM: UInt32 {
         get {
-            return 4 * EIGHT_KB // We only support 32 Kb of ROM
+            return THIRTY_TWO_KB // We only support 32 KB of ROM
         }
     }
     var totalRAM: UInt32 {
@@ -40,8 +40,8 @@ class NoMapper: Cartridge {
     }
     
     static func sanityCheckSizes(romSize: UInt32, ramSize: UInt32) -> (Bool, Bool) {
-        let romGood = romSize == 4 * EIGHT_KB
-        let ramGood = ramSize == 0x0000 || ramSize == EIGHT_KB
+        let romGood = romSize == THIRTY_TWO_KB                      // We only support 32 KB
+        let ramGood = ramSize == 0x0000 || ramSize == EIGHT_KB      // Only two possible RAM sizes
         
         return (romGood, ramGood)
     }
@@ -51,7 +51,7 @@ class NoMapper: Cartridge {
     }
     
     func readFromRAM(_ address: Address) -> UInt8 {
-        return ram?[Int(address - MemoryLocations.externalRAMStart)] ?? 0xFF
+        return ram?[Int(address - MemoryLocations.externalRAMRange.lowerBound)] ?? 0xFF
     }
     
     func writeToROM(_ address: Address, _ value: UInt8) {
@@ -62,7 +62,7 @@ class NoMapper: Cartridge {
         // Who cares if they write to RAM that's not that? We don't.
         
         if var ram {
-            ram[Int(address - MemoryLocations.externalRAMStart)] = value
+            ram[Int(address - MemoryLocations.externalRAMRange.lowerBound)] = value
         }
     }
 }
