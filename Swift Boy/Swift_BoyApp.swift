@@ -18,10 +18,12 @@ struct Swift_BoyApp: App {
     
     static func main() {
         // The file we want to load
-        
-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/01-special.gb")
+   
+//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/halt_bug.gb")
+    //let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
+//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/02-interrupts.gb")
-//+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/03-op sp,hl.gb")
+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/03-op sp,hl.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/04-op r,imm.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/05-op rp.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/individual/06-ld r,r.gb")
@@ -34,11 +36,13 @@ struct Swift_BoyApp: App {
         // Create memory with that rom
         
         do {
-            let swiftBoy = try SwiftBoy(romLocation: romURL)
-            
+            let rom = try Data(contentsOf: romURL)
+            let cartridge = try CartridgeHelper.loadROM(rom)
+            let swiftBoy = try SwiftBoy(cartridge: cartridge)
+
             swiftBoy.run()
         } catch {
-            fatalError("Error initializing things: \(error.localizedDescription)")
+            fatalError(error.localizedDescription)
         }
     }
 }

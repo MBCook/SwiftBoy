@@ -20,6 +20,19 @@ enum CPUErrors: Error {
     case Stopped
 }
 
+extension CPUErrors: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case let .InvalidInstruction(opcode):
+            return "Unsupported opcode found: 0x\(toHex(opcode))"
+        case let .BadAddressForOpcode(address):
+            return "No opcode should be at the PC address of 0x\(toHex(address))"
+        case .Stopped:
+            return "CPU stopped by instruction"
+        }
+    }
+}
+
 private enum HaltStatus {
     case notHalted
     case haltedInterruptsOn
@@ -182,6 +195,8 @@ class CPU {
             
             pc = lastPC
         }
+        
+//        print(generateDebugLogLine())
         
         // Inform our caller
         

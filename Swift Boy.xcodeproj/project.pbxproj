@@ -11,6 +11,9 @@
 		4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C13DD4A2941622B00C8786C /* InterruptController.swift */; };
 		4C13DD4D294168B900C8786C /* SwiftBoy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C13DD4C294168B900C8786C /* SwiftBoy.swift */; };
 		4C13DD4F29416BD800C8786C /* Utility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C13DD4E29416BD800C8786C /* Utility.swift */; };
+		4C318A8329455292006F9377 /* CartridgeHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8229455292006F9377 /* CartridgeHelper.swift */; };
+		4C318A8529455B84006F9377 /* Cartridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8429455B84006F9377 /* Cartridge.swift */; };
+		4C318A8829456141006F9377 /* NoMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8729456141006F9377 /* NoMapper.swift */; };
 		4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */; };
 		4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B942293C263800D4EEA0 /* ContentView.swift */; };
 		4C35B945293C263900D4EEA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B944293C263900D4EEA0 /* Assets.xcassets */; };
@@ -24,6 +27,9 @@
 		4C13DD4A2941622B00C8786C /* InterruptController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterruptController.swift; sourceTree = "<group>"; };
 		4C13DD4C294168B900C8786C /* SwiftBoy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftBoy.swift; sourceTree = "<group>"; };
 		4C13DD4E29416BD800C8786C /* Utility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utility.swift; sourceTree = "<group>"; };
+		4C318A8229455292006F9377 /* CartridgeHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CartridgeHelper.swift; sourceTree = "<group>"; };
+		4C318A8429455B84006F9377 /* Cartridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cartridge.swift; sourceTree = "<group>"; };
+		4C318A8729456141006F9377 /* NoMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoMapper.swift; sourceTree = "<group>"; };
 		4C35B93D293C263800D4EEA0 /* Swift Boy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Swift Boy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swift_BoyApp.swift; sourceTree = "<group>"; };
 		4C35B942293C263800D4EEA0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -46,6 +52,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4C318A8629455C3F006F9377 /* Mappers */ = {
+			isa = PBXGroup;
+			children = (
+				4C318A8429455B84006F9377 /* Cartridge.swift */,
+				4C318A8729456141006F9377 /* NoMapper.swift */,
+			);
+			path = Mappers;
+			sourceTree = "<group>";
+		};
 		4C35B934293C263800D4EEA0 = {
 			isa = PBXGroup;
 			children = (
@@ -87,6 +102,8 @@
 		4C35B950293C290900D4EEA0 /* System */ = {
 			isa = PBXGroup;
 			children = (
+				4C318A8629455C3F006F9377 /* Mappers */,
+				4C318A8229455292006F9377 /* CartridgeHelper.swift */,
 				4C35B951293C291600D4EEA0 /* CPU.swift */,
 				4C13DD4A2941622B00C8786C /* InterruptController.swift */,
 				4C35B953293C2AEF00D4EEA0 /* Memory.swift */,
@@ -168,8 +185,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				4C13DD4D294168B900C8786C /* SwiftBoy.swift in Sources */,
+				4C318A8829456141006F9377 /* NoMapper.swift in Sources */,
 				4C35B954293C2AEF00D4EEA0 /* Memory.swift in Sources */,
+				4C318A8329455292006F9377 /* CartridgeHelper.swift in Sources */,
 				4C13DD4F29416BD800C8786C /* Utility.swift in Sources */,
+				4C318A8529455B84006F9377 /* Cartridge.swift in Sources */,
 				4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */,

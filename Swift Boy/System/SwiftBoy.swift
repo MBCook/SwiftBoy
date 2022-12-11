@@ -14,23 +14,25 @@ typealias Register = UInt8
 typealias RegisterPair = UInt16
 typealias Ticks = UInt8
 
-let GAMEBOY_DOCTOR = true
-let BLARGG_TEST_ROMS = false
+let GAMEBOY_DOCTOR = false
+let BLARGG_TEST_ROMS = true
 
 class SwiftBoy {
     // MARK: - Our private variables
     
     private var cpu: CPU
+    private var cartridge: Cartridge
     private var memory: Memory
     private var timer: Timer
     private var interruptController: InterruptController
     
     private var logFile: FileHandle?
     
-    init(romLocation: URL) throws {
+    init(cartridge: Cartridge) throws {
         timer = Timer()
         interruptController = InterruptController()
-        memory = try Memory(romLocation: romLocation, timer: timer, interruptController: interruptController)
+        self.cartridge = cartridge
+        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController)
         cpu = CPU(memory: memory, interruptController: interruptController)
     }
     
@@ -85,15 +87,12 @@ class SwiftBoy {
             
             do {
                 ticksUsed = try cpu.executeInstruction()
-            } catch CPUErrors.InvalidInstruction(let op) {
-                fatalError("Invalid instruction: \(toHex(op))")
-            } catch CPUErrors.BadAddressForOpcode(let address) {
-                fatalError("Invalid address for PC: \(toHex(address))")
-            } catch CPUErrors.Stopped {
-                print("CPU stopped by instruction, exiting")
-                exit(0)
             } catch {
-                fatalError("An unknown error occurred: \(error.localizedDescription)")
+                if error is CPUErrors {
+                    fatalError(error.localizedDescription)
+                } else {
+                    fatalError("An unknown error occurred: \(error.localizedDescription)")
+                }
             }
         }
     }
