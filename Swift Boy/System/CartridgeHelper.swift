@@ -52,7 +52,7 @@ class CartridgeHelper {
         var cartridge: Cartridge.Type
         
         switch type {
-        case 0x00:
+        case 0x00, 0x01:        // TODO: 0x01 is temporary
             cartridge = NoMapper.self
         default:
             throw CartridgeErrors.UnsupportedCartridgeType(type)

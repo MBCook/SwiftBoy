@@ -92,9 +92,9 @@ class InterruptController: MemoryMappedDevice {
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
-        case MemoryLocations.interruptEnable.rawValue:
+        case MemoryLocations.interruptEnable:
             return enabledInterrupts
-        case MemoryLocations.interruptFlags.rawValue:
+        case MemoryLocations.interruptFlags:
             return raisedInterrupts
         default:
             fatalError("The interrupt controller should not have been asked for memory address 0x\(toHex(address))")
@@ -103,9 +103,9 @@ class InterruptController: MemoryMappedDevice {
     
     func writeRegister(_ address: Address, _ value: UInt8) {
         switch address {
-        case MemoryLocations.interruptEnable.rawValue:
+        case MemoryLocations.interruptEnable:
             enabledInterrupts = value
-        case MemoryLocations.interruptFlags.rawValue:
+        case MemoryLocations.interruptFlags:
             raisedInterrupts = value
         default:
             fatalError("The interrupt controller should not have been asked to set memory address 0x\(toHex(address))")

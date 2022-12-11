@@ -7,12 +7,12 @@
 
 import Foundation
 
-enum TimerControlBits: Bitmask {
-    case enabled = 0x04
-    case clockDivIs1024 = 0x00  // 4096 hz
-    case clockDivIs16 = 0x01    // 262144 hz
-    case clockDivIs64 = 0x02    // 65536 hz
-    case clockDivIs256 = 0x03   // 16384 hz
+enum TimerControlBits {
+    static let enabled: Bitmask = 0x04
+    static let clockDivIs1024: Bitmask = 0x00   // 4096 hz
+    static let clockDivIs16: Bitmask = 0x01     // 262144 hz
+    static let clockDivIs64: Bitmask = 0x02     // 65536 hz
+    static let clockDivIs256: Bitmask = 0x03    // 16384 hz
 }
 
 class Timer: MemoryMappedDevice {
@@ -80,7 +80,7 @@ class Timer: MemoryMappedDevice {
         
         // Do we need to update the timer? Only if the time enable bit is on
         
-        guard timerControl & TimerControlBits.enabled.rawValue != 0 else {
+        guard timerControl & TimerControlBits.enabled != 0 else {
             // Timer is off, do nothing
             
             return nil
@@ -91,13 +91,13 @@ class Timer: MemoryMappedDevice {
         let divisor: UInt16
         
         switch timerControl & CLOCK_DIVISOR_MASK {
-        case TimerControlBits.clockDivIs1024.rawValue:
+        case TimerControlBits.clockDivIs1024:
             divisor = 1024
-        case TimerControlBits.clockDivIs16.rawValue:
+        case TimerControlBits.clockDivIs16:
             divisor = 16
-        case TimerControlBits.clockDivIs64.rawValue:
+        case TimerControlBits.clockDivIs64:
             divisor = 64
-        case TimerControlBits.clockDivIs256.rawValue:
+        case TimerControlBits.clockDivIs256:
             divisor = 256
         default:
             // Xcode can't seem to figure out we have all possible cases of 2 bits

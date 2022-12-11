@@ -9,37 +9,36 @@ import Foundation
 
 let EIGHT_KB: UInt32 = 0x2000
 
-enum MemoryLocations: Address {
-    case romStart = 0x0000
-    case romBankStart = 0x4000
-    case romEnd = 0x7FFF
+enum MemoryLocations {
+    static let romStart: Address = 0x0000
+    static let romBankStart: Address = 0x4000
+    static let romEnd: Address = 0x7FFF
     
-    case videoRAMStart = 0x8000
-    case videoRAMEnd = 0x9FFF
+    static let videoRAMStart: Address = 0x8000
+    static let videoRAMEnd: Address = 0x9FFF
     
-    case externalRAMStart = 0xA000
-    case externalRAMBankStart = 0xB000
-    case externalRAMEnd = 0xBFFF
+    static let externalRAMStart: Address = 0xA000
+    static let externalRAMBankStart: Address = 0xB000
+    static let externalRAMEnd: Address = 0xBFFF
     
-    case workRAMStart = 0xC000
-    case workRAMEnd = 0xDFFF
+    static let workRAMStart: Address = 0xC000
+    static let workRAMEnd: Address = 0xDFFF
     
-    case objectAttributeMemoryStart = 0xFE00
-    case objectAttributeMemoryEnd = 0xFE9F
+    static let objectAttributeMemoryStart: Address = 0xFE00
+    static let objectAttributeMemoryEnd: Address = 0xFE9F
     
-    case ioRegisterStart = 0xFF00
+    static let ioRegisterStart: Address = 0xFF00
     
-    case timerRegistersStart = 0xFF04
-    case timerRegistersEnd = 0xFF07
+    static let timerRegistersStart: Address = 0xFF04
+    static let timerRegistersEnd: Address = 0xFF07
+    static let interruptFlags: Address = 0xFF0F
     
-    case interruptFlags = 0xFF0F
+    static let ioRegisterEnd: Address = 0xFF7F
     
-    case ioRegisterEnd = 0xFF7F
+    static let highRAMStart: Address = 0xFF80
+    static let highRAMEnd: Address = 0xFFFE
     
-    case highRAMStart = 0xFF80
-    case highRAMEnd = 0xFFFE
-    
-    case interruptEnable = 0xFFFF
+    static let interruptEnable: Address = 0xFFFF
 }
 
 private enum MemorySection {
@@ -112,19 +111,19 @@ class Memory {
             case .rom:
                 return cartridge.readFromROM(index)
             case .videoRAM:
-                return videoRAM[Int(index - MemoryLocations.videoRAMStart.rawValue)]
+                return videoRAM[Int(index - MemoryLocations.videoRAMStart)]
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
-                return workRAM[Int(index - MemoryLocations.workRAMStart.rawValue)]
+                return workRAM[Int(index - MemoryLocations.workRAMStart)]
             case .objectAttributeMemory:
-                return oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart.rawValue)]
+                return oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart)]
             case .ioRegisters:
-                return ioRegisters[Int(index - MemoryLocations.ioRegisterStart.rawValue)]
+                return ioRegisters[Int(index - MemoryLocations.ioRegisterStart)]
             case .timerRegisters:
                 return timer.readRegister(index)
             case .highRAM:
-                return highRAM[Int(index - MemoryLocations.highRAMStart.rawValue)]
+                return highRAM[Int(index - MemoryLocations.highRAMStart)]
             case .interruptEnable:
                 return interruptController.readRegister(index)
             default:
@@ -138,7 +137,7 @@ class Memory {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.
                 
-                print(String(cString: [ioRegisters[0xFF02 - Int(MemoryLocations.ioRegisterStart.rawValue)], 0x00]), terminator: "")
+                print(String(cString: [ioRegisters[0xFF02 - Int(MemoryLocations.ioRegisterStart)], 0x00]), terminator: "")
                 
                 return
             }
@@ -153,19 +152,19 @@ class Memory {
             case .rom:
                 cartridge.writeToROM(index, value)
             case .videoRAM:
-                videoRAM[Int(index - MemoryLocations.videoRAMStart.rawValue)] = value
+                videoRAM[Int(index - MemoryLocations.videoRAMStart)] = value
             case .externalRAM:
                 cartridge.writeToRAM(index, value)
             case .workRAM:
-                workRAM[Int(index - MemoryLocations.workRAMStart.rawValue)] = value
+                workRAM[Int(index - MemoryLocations.workRAMStart)] = value
             case .objectAttributeMemory:
-                oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart.rawValue)] = value
+                oamRAM[Int(index - MemoryLocations.objectAttributeMemoryStart)] = value
             case .ioRegisters:
-                ioRegisters[Int(index - MemoryLocations.ioRegisterStart.rawValue)] = value
+                ioRegisters[Int(index - MemoryLocations.ioRegisterStart)] = value
             case .timerRegisters:
                 timer.writeRegister(index, value)
             case .highRAM:
-                highRAM[Int(index - MemoryLocations.highRAMStart.rawValue)] = value
+                highRAM[Int(index - MemoryLocations.highRAMStart)] = value
             case .interruptEnable:
                 interruptController.writeRegister(index, value)
             default:
@@ -179,23 +178,23 @@ class Memory {
     
     private func categorizeAddress(_ address: Address) -> MemorySection {
         switch address {
-        case MemoryLocations.romStart.rawValue...MemoryLocations.romEnd.rawValue:
+        case MemoryLocations.romStart...MemoryLocations.romEnd:
             return .rom
-        case MemoryLocations.videoRAMStart.rawValue...MemoryLocations.videoRAMEnd.rawValue:
+        case MemoryLocations.videoRAMStart...MemoryLocations.videoRAMEnd:
             return .videoRAM
-        case MemoryLocations.externalRAMStart.rawValue...MemoryLocations.externalRAMStart.rawValue:
+        case MemoryLocations.externalRAMStart...MemoryLocations.externalRAMStart:
             return .externalRAM
-        case MemoryLocations.workRAMStart.rawValue...MemoryLocations.workRAMEnd.rawValue:
+        case MemoryLocations.workRAMStart...MemoryLocations.workRAMEnd:
             return .workRAM
-        case MemoryLocations.objectAttributeMemoryStart.rawValue...MemoryLocations.objectAttributeMemoryEnd.rawValue:
+        case MemoryLocations.objectAttributeMemoryStart...MemoryLocations.objectAttributeMemoryEnd:
             return .objectAttributeMemory
-        case MemoryLocations.timerRegistersStart.rawValue...MemoryLocations.timerRegistersEnd.rawValue:
+        case MemoryLocations.timerRegistersStart...MemoryLocations.timerRegistersEnd:
             return .timerRegisters
-        case MemoryLocations.ioRegisterStart.rawValue...MemoryLocations.ioRegisterEnd.rawValue:
+        case MemoryLocations.ioRegisterStart...MemoryLocations.ioRegisterEnd:
             return .ioRegisters
-        case MemoryLocations.highRAMStart.rawValue...MemoryLocations.highRAMEnd.rawValue:
+        case MemoryLocations.highRAMStart...MemoryLocations.highRAMEnd:
             return .highRAM
-        case MemoryLocations.interruptEnable.rawValue:
+        case MemoryLocations.interruptEnable:
             return .interruptEnable
         default:
             return .other

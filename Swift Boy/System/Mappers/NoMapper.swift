@@ -51,7 +51,7 @@ class NoMapper: Cartridge {
     }
     
     func readFromRAM(_ address: Address) -> UInt8 {
-        return ram?[Int(address - MemoryLocations.externalRAMStart.rawValue)] ?? 0xFF
+        return ram?[Int(address - MemoryLocations.externalRAMStart)] ?? 0xFF
     }
     
     func writeToROM(_ address: Address, _ value: UInt8) {
@@ -62,7 +62,7 @@ class NoMapper: Cartridge {
         // Who cares if they write to RAM that's not that? We don't.
         
         if var ram {
-            ram[Int(address - MemoryLocations.externalRAMStart.rawValue)] = value
+            ram[Int(address - MemoryLocations.externalRAMStart)] = value
         }
     }
 }
