@@ -28,7 +28,7 @@ enum MemoryLocations {
     
     static let objectAttributeMemoryRange: ClosedRange<Address> = 0xFE00...0xFE9F
     
-    static let ioRegisterRange: ClosedRange<Address> = 0xFF00...0xFF7F
+    static let ioRegisterRange: ClosedRange<Address> = 0xFF00...0xFF4B  // Range is larget on CGB, up to 7F
     static let serialData: Address = 0xFF01
     static let serialControl: Address = 0xFF02
     static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07

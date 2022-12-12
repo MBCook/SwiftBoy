@@ -103,8 +103,6 @@ class MBC1: Cartridge {
     }
     
     func writeToROM(_ address: Address, _ value: UInt8) {
-        print("ROM write of 0x\(toHex(value)) to 0x\(toHex(address))")
-        
         switch address {
         case 0x0000...0x1FFF:
             // Controls if RAM is enabled or not (we'll ignore it if there is no RAM)
