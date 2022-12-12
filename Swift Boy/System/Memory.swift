@@ -35,7 +35,7 @@ enum MemoryLocations {
     static let interruptFlags: Address = 0xFF0F
     
     static let lcdRegisterRange: ClosedRange<Address> = 0xFF40...0xFF4B
-    static let lcdYRegister: Address = 0xFF44
+    static let dmaRegister: Address = 0xFF46
     
     static let highRAMRange: ClosedRange<Address> = 0xFF80...0xFFFE
     
@@ -50,6 +50,8 @@ private enum MemorySection {
     case objectAttributeMemory
     case timerRegisters
     case ioRegisters
+    case lcdRegisters
+    case dmaRegister
     case highRAM
     case interruptEnable
     case other
@@ -74,34 +76,29 @@ class Memory {
     // We also need some other objects we'll redirect memory access to
     private var timer: MemoryMappedDevice
     private var interruptController: InterruptController
+    private var lcdController: LCDController
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, lcdController: LCDController) {
         // Allocate the various RAM banks built into the Game Boy
         
         videoRAM = Data(count: Int(EIGHT_KB))
         workRAM = Data(count: Int(EIGHT_KB))
         highRAM = Data(count: 128)
         oamRAM = Data(count: 160)
-        ioRegisters = Data(count: 128)
+        ioRegisters = Data(count: 76)
         
         // Save references to the other objects
         
         self.cartridge = cartridge
         self.timer = timer
         self.interruptController = interruptController
+        self.lcdController = lcdController
     }
     
     subscript(index: Address) -> UInt8 {
         get {
-            // Quick debug test
-            
-            if GAMEBOY_DOCTOR && index == MemoryLocations.lcdYRegister {
-                // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
-                return 0x90
-            }
-            
             // Categorize the read
             
             let section = categorizeAddress(index)
@@ -123,6 +120,8 @@ class Memory {
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .timerRegisters:
                 return timer.readRegister(index)
+            case .lcdRegisters:
+                return lcdController.readRegister(index)
             case .highRAM:
                 return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
             case .interruptEnable:
@@ -165,6 +164,17 @@ class Memory {
                 ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
             case .timerRegisters:
                 timer.writeRegister(index, value)
+            case .lcdRegisters:
+                lcdController.writeRegister(index, value)
+            case .dmaRegister:
+                // When they write, we copy 160 bytes from 0x(value)00 to 0xFE00
+                
+                // NOTE: This should take 160 cycles and should block access to various parts of memory.
+                // We're going to assume that timing isn't critical for now
+                
+                for address: UInt16 in 0x00...0x9F {
+                    oamRAM[Int(address + MemoryLocations.objectAttributeMemoryRange.lowerBound)] = self[address + UInt16(value << 8)]
+                }
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptEnable:
@@ -194,6 +204,10 @@ class Memory {
             return .timerRegisters
         case MemoryLocations.ioRegisterRange:
             return .ioRegisters
+        case MemoryLocations.dmaRegister:
+            return .dmaRegister
+        case MemoryLocations.lcdRegisterRange:
+            return .lcdRegisters
         case MemoryLocations.highRAMRange:
             return .highRAM
         case MemoryLocations.interruptEnable:

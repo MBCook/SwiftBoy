@@ -25,14 +25,16 @@ class SwiftBoy {
     private var memory: Memory
     private var timer: Timer
     private var interruptController: InterruptController
+    private var lcdController: LCDController
     
     private var logFile: FileHandle?
     
     init(cartridge: Cartridge) throws {
         timer = Timer()
         interruptController = InterruptController()
+        lcdController = LCDController()
         self.cartridge = cartridge
-        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController)
+        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, lcdController: lcdController)
         cpu = CPU(memory: memory, interruptController: interruptController)
     }
     
