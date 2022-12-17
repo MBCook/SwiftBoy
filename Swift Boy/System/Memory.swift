@@ -77,10 +77,12 @@ class Memory {
     private var timer: MemoryMappedDevice
     private var interruptController: InterruptController
     private var lcdController: LCDController
+    private var dmaController: DMAController
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, lcdController: LCDController) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController,
+         lcdController: LCDController, dmaController: DMAController) {
         // Allocate the various RAM banks built into the Game Boy
         
         videoRAM = Data(count: Int(EIGHT_KB))
@@ -95,6 +97,7 @@ class Memory {
         self.timer = timer
         self.interruptController = interruptController
         self.lcdController = lcdController
+        self.dmaController = dmaController
     }
     
     subscript(index: Address) -> UInt8 {
@@ -102,7 +105,13 @@ class Memory {
             // Categorize the read
             
             let section = categorizeAddress(index)
+
+            // During DMA you can only access high RAM
             
+            guard !dmaController.dmaInProgress() || section == .highRAM else {
+                return 0xFF     // Open bus, you wouldn't have been able to read anything at that address
+            }
+
             // Route it to the right place
             
             switch section {
@@ -120,6 +129,8 @@ class Memory {
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .timerRegisters:
                 return timer.readRegister(index)
+            case .dmaRegister:
+                return dmaController.readRegister(index)
             case .lcdRegisters:
                 return lcdController.readRegister(index)
             case .highRAM:
@@ -147,6 +158,12 @@ class Memory {
             
             let section = categorizeAddress(index)
             
+            // During DMA you can only access high RAM
+            
+            guard !dmaController.dmaInProgress() || section == .highRAM else {
+                return  // During DMA you can't write to that address
+            }
+            
             // Route it to the right place
             
             switch section {
@@ -167,14 +184,7 @@ class Memory {
             case .lcdRegisters:
                 lcdController.writeRegister(index, value)
             case .dmaRegister:
-                // When they write, we copy 160 bytes from 0x(value)00 to 0xFE00
-                
-                // NOTE: This should take 160 cycles and should block access to various parts of memory.
-                // We're going to assume that timing isn't critical for now
-                
-                for address: UInt16 in 0x00...0x9F {
-                    oamRAM[Int(address + MemoryLocations.objectAttributeMemoryRange.lowerBound)] = self[address + UInt16(value << 8)]
-                }
+                dmaController.writeRegister(index, value)
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptEnable:

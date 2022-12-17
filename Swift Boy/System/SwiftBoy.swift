@@ -26,6 +26,7 @@ class SwiftBoy {
     private var timer: Timer
     private var interruptController: InterruptController
     private var lcdController: LCDController
+    private var dmaController: DMAController
     
     private var logFile: FileHandle?
     
@@ -34,7 +35,10 @@ class SwiftBoy {
         interruptController = InterruptController()
         lcdController = LCDController()
         self.cartridge = cartridge
-        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, lcdController: lcdController)
+        dmaController = DMAController()
+        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController,
+                        lcdController: lcdController, dmaController: dmaController)
+        dmaController.setMemory(memory: memory)
         cpu = CPU(memory: memory, interruptController: interruptController)
     }
     
@@ -83,6 +87,10 @@ class SwiftBoy {
             if let timerInterrupt {
                 interruptController.raiseInterrupt(timerInterrupt)
             }
+            
+            // Update our DMA status
+            
+            dmaController.tick(ticksUsed)
             
             // Print some debug stuff if in Gameboy Doctor mode
             

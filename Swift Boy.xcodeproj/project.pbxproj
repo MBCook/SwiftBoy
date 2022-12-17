@@ -22,6 +22,7 @@
 		4C35B948293C263900D4EEA0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B947293C263900D4EEA0 /* Preview Assets.xcassets */; };
 		4C35B952293C291600D4EEA0 /* CPU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B951293C291600D4EEA0 /* CPU.swift */; };
 		4C35B954293C2AEF00D4EEA0 /* Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B953293C2AEF00D4EEA0 /* Memory.swift */; };
+		4C92EA14294D52F800412D30 /* DMAController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C92EA13294D52F800412D30 /* DMAController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,7 @@
 		4C35B94F293C26B500D4EEA0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		4C35B951293C291600D4EEA0 /* CPU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPU.swift; sourceTree = "<group>"; };
 		4C35B953293C2AEF00D4EEA0 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
+		4C92EA13294D52F800412D30 /* DMAController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMAController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +118,7 @@
 				4C13DD4829415F1300C8786C /* Timer.swift */,
 				4C13DD4E29416BD800C8786C /* Utility.swift */,
 				4C318A8B2946B272006F9377 /* LCDController.swift */,
+				4C92EA13294D52F800412D30 /* DMAController.swift */,
 			);
 			path = System;
 			sourceTree = "<group>";
@@ -196,6 +199,7 @@
 				4C318A8329455292006F9377 /* CartridgeHelper.swift in Sources */,
 				4C13DD4F29416BD800C8786C /* Utility.swift in Sources */,
 				4C318A8529455B84006F9377 /* Cartridge.swift in Sources */,
+				4C92EA14294D52F800412D30 /* DMAController.swift in Sources */,
 				4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4C318A8A29467265006F9377 /* MBC1.swift in Sources */,
