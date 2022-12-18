@@ -64,6 +64,7 @@ class DMAController: MemoryMappedDevice {
         lastSource = value
         
         // TODO: What happens on a Game Boy if an interrupt happens during DMA?
+        // TODO: For now we're not going to let DMA read/write OAM during modes 2 (OAM scan) and 3 (drawing) or read video RAM during 3.
         
         // Copy all the data right now
         

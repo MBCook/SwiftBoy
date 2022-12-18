@@ -67,28 +67,23 @@ class Memory {
     // MARK: - Our private data
     
     private var cartridge: Cartridge    // A representation of the game cartridge
-    private var videoRAM: Data                  // Built in RAM to hold sprites and tiles
-    private var workRAM: Data                   // Built in RAM for program operation
-    private var highRAM: Data                   // Tiny bit more RAM for programs to use, where the stack lives, and works during DMA
-    private var oamRAM: Data                    // TODO: Until a proper video system exists
-    private var ioRegisters: Data               // Other registers we don't handle properly yet, act like they're normal RAM
+    private var workRAM: Data           // Built in RAM for program operation
+    private var highRAM: Data           // Tiny bit more RAM for programs to use, where the stack lives, and works during DMA
+    private var ioRegisters: Data       // Other registers we don't handle properly yet, act like they're normal RAM
     
     // We also need some other objects we'll redirect memory access to
     private var timer: MemoryMappedDevice
     private var interruptController: InterruptController
     private var lcdController: LCDController
-    private var dmaController: DMAController
     
     // MARK: Public methods
     
     init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController,
-         lcdController: LCDController, dmaController: DMAController) {
+         lcdController: LCDController) {
         // Allocate the various RAM banks built into the Game Boy
         
-        videoRAM = Data(count: Int(EIGHT_KB))
         workRAM = Data(count: Int(EIGHT_KB))
         highRAM = Data(count: 128)
-        oamRAM = Data(count: 160)
         ioRegisters = Data(count: 76)
         
         // Save references to the other objects
@@ -97,7 +92,6 @@ class Memory {
         self.timer = timer
         self.interruptController = interruptController
         self.lcdController = lcdController
-        self.dmaController = dmaController
     }
     
     subscript(index: Address) -> UInt8 {
@@ -108,7 +102,7 @@ class Memory {
 
             // During DMA you can only access high RAM
             
-            guard !dmaController.dmaInProgress() || section == .highRAM else {
+            guard !lcdController.dmaInProgress() || section == .highRAM else {
                 return 0xFF     // Open bus, you wouldn't have been able to read anything at that address
             }
 
@@ -117,22 +111,16 @@ class Memory {
             switch section {
             case .rom:
                 return cartridge.readFromROM(index)
-            case .videoRAM:
-                return videoRAM[Int(index - MemoryLocations.videoRAMRange.lowerBound)]
+            case .videoRAM, .lcdRegisters, .objectAttributeMemory:
+                return lcdController.readRegister(index)
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
                 return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
-            case .objectAttributeMemory:
-                return oamRAM[Int(index - MemoryLocations.objectAttributeMemoryRange.lowerBound)]
             case .ioRegisters:
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .timerRegisters:
                 return timer.readRegister(index)
-            case .dmaRegister:
-                return dmaController.readRegister(index)
-            case .lcdRegisters:
-                return lcdController.readRegister(index)
             case .highRAM:
                 return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
             case .interruptEnable:
@@ -160,7 +148,7 @@ class Memory {
             
             // During DMA you can only access high RAM
             
-            guard !dmaController.dmaInProgress() || section == .highRAM else {
+            guard !lcdController.dmaInProgress() || section == .highRAM else {
                 return  // During DMA you can't write to that address
             }
             
@@ -169,22 +157,16 @@ class Memory {
             switch section {
             case .rom:
                 cartridge.writeToROM(index, value)
-            case .videoRAM:
-                videoRAM[Int(index - MemoryLocations.videoRAMRange.lowerBound)] = value
+            case .videoRAM, .lcdRegisters, .objectAttributeMemory:
+                lcdController.writeRegister(index, value)
             case .externalRAM:
                 cartridge.writeToRAM(index, value)
             case .workRAM:
                 workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
-            case .objectAttributeMemory:
-                oamRAM[Int(index - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
             case .ioRegisters:
                 ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
             case .timerRegisters:
                 timer.writeRegister(index, value)
-            case .lcdRegisters:
-                lcdController.writeRegister(index, value)
-            case .dmaRegister:
-                dmaController.writeRegister(index, value)
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptEnable:
