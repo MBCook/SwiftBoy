@@ -241,7 +241,7 @@ class PPU: MemoryMappedDevice {
         var sprites: [(OAMOffset, PixelCoordinate)] = []
         
         for offset in stride(from: 0, to: OAM_ENTRIES, by: BYTES_PER_OAM)  {
-            let spriteY = findSpriteYCoordinate(offset, realY: lcdYCoordinate)
+            let spriteY = findSpriteYCoordinate(offset, lcdY: lcdYCoordinate)
             
             if let spriteY {
                 // This line of the sprite needs displaying (unless it's off screen left or right, but that's not our problem)
@@ -258,22 +258,51 @@ class PPU: MemoryMappedDevice {
         return sprites
     }
     
-    private func findSpriteYCoordinate(_ offset: OAMOffset, realY: PixelCoordinate) -> PixelCoordinate? {
+    private func findBackgroundCoordinates() -> (PixelCoordinate, PixelCoordinate)? {
+        if lcdControl & LCDControl.bgWindowEnable > 0 {
+            // The background is turned on, figure out the Y coordinate into the full background
+            // Add the current Y position to the viewport offset then wrap to 256 becasue the background repeats
+            
+            var result = lcdYCoordinate
+            
+            result &+= viewportY    // Wrap around on 256
+            
+            return (viewportX, result)
+        } else {
+            // If the background is turned off we don't have a coordinate
+            
+            return nil
+        }
+    }
+    
+    private func findWindowCoordinates() -> (Int16, PixelCoordinate)? {
+        if lcdControl & LCDControl.windowEnable > 0 && lcdControl & LCDControl.bgWindowEnable > 0 {
+            // The window is turned on, things always start at 0,0 so all that matters is what line we're on
+            
+            return (Int16(windowX) - 7, lcdYCoordinate - windowY)   // Int 16 becasue the start can be negative or >127
+        } else {
+            // If the window is turned off we don't have a coordinate
+            
+            return nil
+        }
+    }
+    
+    private func findSpriteYCoordinate(_ offset: OAMOffset, lcdY: PixelCoordinate) -> PixelCoordinate? {
         let objectHeight = ((lcdControl & LCDControl.objectSize) > 0) ? 8 : 16
         let objectStart = Int(oamRAM[Int(offset + OAM_Y_POSITION)]) - 16
         
-        if realY < objectStart {
+        if lcdY < objectStart {
             // Haven't gotten to a line in the sprite, so nil
             
             return nil
-        } else if realY >= objectStart + objectHeight {
+        } else if lcdY >= objectStart + objectHeight {
             // We're past the bottom of the sprite, so nil
             
             return nil
         } else {
             // We can calculate the line
             
-            return UInt8(Int(realY) - objectStart)
+            return UInt8(Int(lcdY) - objectStart)
         }
     }
     
