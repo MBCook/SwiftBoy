@@ -21,7 +21,6 @@ class Timer: MemoryMappedDevice {
     
     private var lastDivRegisterIncrement: UInt8         // The last time the DIV register was incremented
     private var lastTimerRegisterIncrement: UInt16      // The last time the counter was incremented
-    private var stopMode: Bool                          // Do we stop the timers?
     
     private let TICKS_PER_DIV = 64
     private let CLOCK_DIVISOR_MASK: UInt8 = 0x03
@@ -49,23 +48,9 @@ class Timer: MemoryMappedDevice {
         timerCounter = 0
         timerModulo = 0
         timerControl = 0
-        stopMode = false
-    }
-    
-    func enterStopMode() {
-        stopMode = true
-        divRegister = 0
     }
     
     func tick(_ ticks: Ticks) -> InterruptSource? {
-        // Handle ticks of the clock
-        
-        guard !stopMode else {
-            // Don't do anything in stop mode
-            
-            return nil
-        }
-            
         // Handle each part of the clock independently. First the div register, which is always counting up.
         
         lastDivRegisterIncrement = lastDivRegisterIncrement + ticks

@@ -18,6 +18,13 @@ private let BACKGROUND_PALETTE: Address = 0xFF47
 private let WINDOW_Y: Address = 0xFF4A
 private let WINDOW_X: Address = 0xFF4B
 
+private let OAM_ENTRIES: UInt8 = 4
+private let BYTES_PER_OAM = 4
+private let OAM_Y_POSITION: UInt8 = 0
+private let OAM_X_POSITION: UInt8 = 1
+private let OAM_TILE_INDEX: UInt8 = 2
+private let OAM_ATTRIBUTES: UInt8 = 3
+
 private enum LCDControl {
     static let lcdEnable: UInt8 = 0x80
     static let windowTilemapArea: UInt8 = 0x40
@@ -53,6 +60,16 @@ private enum LCDColors {
     static let black: UInt8 = 0x03
 }
 
+private enum OAMAttributes {
+    static let backgroundWindowOverObject: UInt8 = 0x80
+    static let yFlip: UInt8 = 0x40
+    static let xFlip: UInt8 = 0x20
+    static let paletteNumber: UInt8 = 0x10
+}
+
+private typealias OAMOffset = UInt8
+private typealias PixelCoordinate = UInt8
+
 class LCDController: MemoryMappedDevice {
     
     // MARK: - Our private data
@@ -60,16 +77,16 @@ class LCDController: MemoryMappedDevice {
     private var videoRAM: Data                  // Built in RAM to hold sprites and tiles
     private var oamRAM: Data                    // RAM that controls sprite/timemap display
     
-    private var currentMode: UInt8              // Current LCD mode
+    private var currentMode: Register           // Current LCD mode
     private var ticksIntoLine: UInt16
     
     private var dmaController: DMAController    // We'll need a reference to this for DMA work
     
     // MARK: - Our registers
     
-    private var lcdControl: UInt8
-    private var _lcdStatus: UInt8       // The REAL LCD status register
-    private var lcdStatus: UInt8 {
+    private var lcdControl: Register
+    private var _lcdStatus: Register            // The REAL LCD status register
+    private var lcdStatus: Register {
         get {
             // We don't really store the current mode in the register, so add it in on read
             return _lcdStatus | currentMode
@@ -80,13 +97,13 @@ class LCDController: MemoryMappedDevice {
             _lcdStatus = value & 0x78
         }
     }
-    private var viewportY: UInt8
-    private var viewportX: UInt8
-    private var lcdYCoordinate: UInt8
-    private var lcdYCompare: UInt8
-    private var backgroundPalette: UInt8
-    private var windowY: UInt8
-    private var windowX: UInt8
+    private var viewportY: PixelCoordinate
+    private var viewportX: PixelCoordinate
+    private var lcdYCoordinate: PixelCoordinate
+    private var lcdYCompare: PixelCoordinate
+    private var backgroundPalette: Register
+    private var windowY: PixelCoordinate
+    private var windowX: PixelCoordinate
     
     // MARK: - Public interface
     
@@ -128,6 +145,12 @@ class LCDController: MemoryMappedDevice {
     }
     
     func tick(_ ticks: Ticks) -> InterruptSource? {
+        // If the LCD is off, we don't draw or do anything.
+        
+        guard lcdControl & LCDControl.lcdEnable > 0 else {
+            return nil
+        }
+        
         // First, update the DMA controller
         
         dmaController.tick(ticks)
@@ -200,8 +223,58 @@ class LCDController: MemoryMappedDevice {
     
     // MARK: - Private methods
     
-    func drawLine() {
+    private func drawLine() {
         // TODO: This
+    }
+    
+    private func findSpritesForLine() -> [(OAMOffset, PixelCoordinate)] {
+        // Find the first 10 sprites on the current line, returning (OAM offset, sprite line) so we can draw them
+        
+        guard lcdControl & LCDControl.objectEnable > 0 else {
+            // If sprites are turned off, why are we doing anythikng?
+            
+            return []
+        }
+        
+        // Search through the OAM entries
+        
+        var sprites: [(OAMOffset, PixelCoordinate)] = []
+        
+        for offset in stride(from: 0, to: OAM_ENTRIES, by: BYTES_PER_OAM)  {
+            let spriteY = findSpriteYCoordinate(offset, realY: lcdYCoordinate)
+            
+            if let spriteY {
+                // This line of the sprite needs displaying (unless it's off screen left or right, but that's not our problem)
+                sprites.append((offset, spriteY))
+            }
+            
+            if sprites.count == 10 {
+                // If we've found 10, we have what we need
+                
+                break;
+            }
+        }
+        
+        return sprites
+    }
+    
+    private func findSpriteYCoordinate(_ offset: OAMOffset, realY: PixelCoordinate) -> PixelCoordinate? {
+        let objectHeight = ((lcdControl & LCDControl.objectSize) > 0) ? 8 : 16
+        let objectStart = Int(oamRAM[Int(offset + OAM_Y_POSITION)]) - 16
+        
+        if realY < objectStart {
+            // Haven't gotten to a line in the sprite, so nil
+            
+            return nil
+        } else if realY >= objectStart + objectHeight {
+            // We're past the bottom of the sprite, so nil
+            
+            return nil
+        } else {
+            // We can calculate the line
+            
+            return UInt8(Int(realY) - objectStart)
+        }
     }
     
     // MARK: - MemoryMappedDevice protocol functions
@@ -264,6 +337,14 @@ class LCDController: MemoryMappedDevice {
             // You're allowed to access video RAM during this time, so have at it
             videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)] = value
         case LCD_CONTROL:
+            // When the LCD is disabled we'll set our internal state so it's sane on restart
+            
+            if value & LCDControl.lcdEnable == 0 && lcdControl & LCDControl.lcdEnable > 0 {
+                lcdYCoordinate = 144                    // The first line of the vertical blank period
+                ticksIntoLine = 0                       // We'll restart at the start of the line
+                currentMode = LCDMode.verticalBlank     // We'll be in the vertical blank
+            }
+            
             return lcdControl = value
         case LCD_STATUS:
             lcdStatus = value
