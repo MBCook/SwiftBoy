@@ -13,7 +13,6 @@ let THIRTY_TWO_KB: UInt32 = 0x8000
 let ONE_MB: UInt32 = 0x100000
 let TWO_MB: UInt32 = 0x200000
 
-let ROM_BANK_MASK: Address = 0x3FFF  // The size of one ROM bank on the Game Boy for masking purposes
 let RAM_BANK_MASK: Address = 0x1FFF  // The size of one RAM bank on the Game Boy for masking purposes
 
 enum MemoryLocations {
@@ -74,12 +73,11 @@ class Memory {
     // We also need some other objects we'll redirect memory access to
     private var timer: MemoryMappedDevice
     private var interruptController: InterruptController
-    private var lcdController: LCDController
+    private var ppu: PPU
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController,
-         lcdController: LCDController) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU) {
         // Allocate the various RAM banks built into the Game Boy
         
         workRAM = Data(count: Int(EIGHT_KB))
@@ -91,7 +89,7 @@ class Memory {
         self.cartridge = cartridge
         self.timer = timer
         self.interruptController = interruptController
-        self.lcdController = lcdController
+        self.ppu = ppu
     }
     
     subscript(index: Address) -> UInt8 {
@@ -102,7 +100,7 @@ class Memory {
 
             // During DMA you can only access high RAM
             
-            guard !lcdController.dmaInProgress() || section == .highRAM else {
+            guard !ppu.dmaInProgress() || section == .highRAM else {
                 return 0xFF     // Open bus, you wouldn't have been able to read anything at that address
             }
 
@@ -112,7 +110,7 @@ class Memory {
             case .rom:
                 return cartridge.readFromROM(index)
             case .videoRAM, .lcdRegisters, .objectAttributeMemory:
-                return lcdController.readRegister(index)
+                return ppu.readRegister(index)
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
@@ -148,7 +146,7 @@ class Memory {
             
             // During DMA you can only access high RAM
             
-            guard !lcdController.dmaInProgress() || section == .highRAM else {
+            guard !ppu.dmaInProgress() || section == .highRAM else {
                 return  // During DMA you can't write to that address
             }
             
@@ -158,7 +156,7 @@ class Memory {
             case .rom:
                 cartridge.writeToROM(index, value)
             case .videoRAM, .lcdRegisters, .objectAttributeMemory:
-                lcdController.writeRegister(index, value)
+                ppu.writeRegister(index, value)
             case .externalRAM:
                 cartridge.writeToRAM(index, value)
             case .workRAM:

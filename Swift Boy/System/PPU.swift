@@ -1,5 +1,5 @@
 //
-//  LCDController.swift
+//  PPU.swift
 //  Swift Boy
 //
 //  Created by Michael Cook on 12/11/22.
@@ -50,7 +50,7 @@ private enum LCDMode {
     static let searchingOAM: UInt8 = 0x02
     static let drawingToLCD: UInt8 = 0x03
     
-    static let oamBlockedStatus: ClosedRange = LCDMode.searchingOAM...LCDMode.drawingToLCD
+    static let oamBlockedStatus: ClosedRange = LCDMode.searchingOAM...LCDMode.drawingToLCD  // The statuses where OAM is blocked
 }
 
 private enum LCDColors {
@@ -70,26 +70,26 @@ private enum OAMAttributes {
 private typealias OAMOffset = UInt8
 private typealias PixelCoordinate = UInt8
 
-class LCDController: MemoryMappedDevice {
+class PPU: MemoryMappedDevice {
     
     // MARK: - Our private data
     
     private var videoRAM: Data                  // Built in RAM to hold sprites and tiles
     private var oamRAM: Data                    // RAM that controls sprite/timemap display
     
-    private var currentMode: Register           // Current LCD mode
+    private var ppuMode: Register               // Current PPU mode
     private var ticksIntoLine: UInt16
     
-    private var dmaController: DMAController    // We'll need a reference to this for DMA work
+    private var dmaController: DMAController    // The DMA controller only exists to help the PPU by moving data fast
     
     // MARK: - Our registers
     
     private var lcdControl: Register
     private var _lcdStatus: Register            // The REAL LCD status register
-    private var lcdStatus: Register {
+    private var lcdStatus: Register {           // The fake one to handle making reads and writes easy
         get {
             // We don't really store the current mode in the register, so add it in on read
-            return _lcdStatus | currentMode
+            return _lcdStatus | ppuMode
         }
         set (value) {
             // You may not write to bits 3-6, so we'll mask off everything else
@@ -100,7 +100,7 @@ class LCDController: MemoryMappedDevice {
     private var viewportY: PixelCoordinate
     private var viewportX: PixelCoordinate
     private var lcdYCoordinate: PixelCoordinate
-    private var lcdYCompare: PixelCoordinate
+    private var lcdYCompare: Register
     private var backgroundPalette: Register
     private var windowY: PixelCoordinate
     private var windowX: PixelCoordinate
@@ -127,7 +127,7 @@ class LCDController: MemoryMappedDevice {
         lcdYCoordinate = 144                    // The first line of the vertical blank period
         _lcdStatus = 0                          // Nothing special going on (current mode is ORed in on read)
         ticksIntoLine = 0
-        currentMode = LCDMode.verticalBlank
+        ppuMode = LCDMode.verticalBlank
         
         // The rest we'll just set to 0x00 unless the hardware sets it based on state like the LCD status
         
@@ -174,35 +174,35 @@ class LCDController: MemoryMappedDevice {
                 // Time for a new screen!
                 
                 lcdYCoordinate = 0
-                currentMode = LCDMode.searchingOAM
+                ppuMode = LCDMode.searchingOAM
                 
                 needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
-            } else if lcdYCoordinate >= 144 && currentMode != LCDMode.verticalBlank {
+            } else if lcdYCoordinate >= 144 && ppuMode != LCDMode.verticalBlank {
                 // We're doing the vertical blank now, set it up
-                currentMode = LCDMode.verticalBlank
+                ppuMode = LCDMode.verticalBlank
                 
                 needsInterrupt = (lcdStatus & LCDStatus.vBankInterruptSource) > 0  // Flag interrupt if needed
-            } else if currentMode != LCDMode.verticalBlank {
+            } else if ppuMode != LCDMode.verticalBlank {
                 // Just a normal new line when not in the vertical blank
                 
-                currentMode = LCDMode.searchingOAM
+                ppuMode = LCDMode.searchingOAM
                 
                 needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
             }
-        } else if currentMode != LCDMode.verticalBlank {
+        } else if ppuMode != LCDMode.verticalBlank {
             // In vertical blank there is nothing to do during a line, so only act if that's not what's going on
             
-            if ticksIntoLine > 80 && ticksIntoLine <= 252 && currentMode != LCDMode.drawingToLCD {
+            if ticksIntoLine > 80 && ticksIntoLine <= 252 && ppuMode != LCDMode.drawingToLCD {
                 // Transition to drawing mode. We'll pretend it ALWAYS takes 172 ticks instead of variable like a real GameBoy
                 // As soon as this mode starts we'll draw the line for output by calling drawLine()
                 
-                currentMode = LCDMode.drawingToLCD
+                ppuMode = LCDMode.drawingToLCD
                 
                 drawLine()
-            } else if ticksIntoLine > 252 && currentMode != LCDMode.horizontablBlank {
+            } else if ticksIntoLine > 252 && ppuMode != LCDMode.horizontablBlank {
                 // Transition to Horizontal Blank
                 
-                currentMode = LCDMode.horizontablBlank
+                ppuMode = LCDMode.horizontablBlank
                 
                 needsInterrupt = (lcdStatus & LCDStatus.hBlankInterruptSource) > 0  // Flag interrupt if needed
             }
@@ -281,14 +281,14 @@ class LCDController: MemoryMappedDevice {
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(currentMode):
+        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(ppuMode):
             // During these times any reads return 0xFF becuase the memory is blocked
             // It would also trigger OAM corruption, which we'll ignore
             return 0xFF
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time it just returns 0x00 no matter what's in the memory
             return 0x00
-        case MemoryLocations.videoRAMRange where currentMode == LCDMode.drawingToLCD:
+        case MemoryLocations.videoRAMRange where ppuMode == LCDMode.drawingToLCD:
             // During this time you can't access the video RAM, so we'll return 0xFF
             return 0xFF
         case MemoryLocations.videoRAMRange:
@@ -324,13 +324,13 @@ class LCDController: MemoryMappedDevice {
     
     func writeRegister(_ address: Address, _ value: UInt8) {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(currentMode):
+        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(ppuMode):
             // During these times the memory is blocked and you can't write
             return
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time writing is OK
             oamRAM[Int(address - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
-        case MemoryLocations.videoRAMRange where currentMode == LCDMode.drawingToLCD:
+        case MemoryLocations.videoRAMRange where ppuMode == LCDMode.drawingToLCD:
             // During this time you can't access the video RAM, so you can't write
             return
         case MemoryLocations.videoRAMRange:
@@ -342,7 +342,7 @@ class LCDController: MemoryMappedDevice {
             if value & LCDControl.lcdEnable == 0 && lcdControl & LCDControl.lcdEnable > 0 {
                 lcdYCoordinate = 144                    // The first line of the vertical blank period
                 ticksIntoLine = 0                       // We'll restart at the start of the line
-                currentMode = LCDMode.verticalBlank     // We'll be in the vertical blank
+                ppuMode = LCDMode.verticalBlank     // We'll be in the vertical blank
             }
             
             return lcdControl = value

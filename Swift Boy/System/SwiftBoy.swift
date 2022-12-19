@@ -25,19 +25,23 @@ class SwiftBoy {
     private var memory: Memory
     private var timer: Timer
     private var interruptController: InterruptController
-    private var lcdController: LCDController
+    private var ppu: PPU
     
     private var logFile: FileHandle?
     
     init(cartridge: Cartridge) throws {
+        let dmaController = DMAController()
+        
         timer = Timer()
         interruptController = InterruptController()
-        let dmaController = DMAController()
-        lcdController = LCDController(dmaController: dmaController)
-        self.cartridge = cartridge
-        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, lcdController: lcdController)
+        ppu = PPU(dmaController: dmaController)
+        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu)
+        
         dmaController.setMemory(memory: memory)
+        
         cpu = CPU(memory: memory, interruptController: interruptController)
+        
+        self.cartridge = cartridge
     }
     
     // The main runloop
@@ -88,7 +92,7 @@ class SwiftBoy {
             
             // Update the LCD controller status (it will update DMA controller for us)
             
-            let lcdInterrupt = lcdController.tick(ticksUsed)
+            let lcdInterrupt = ppu.tick(ticksUsed)
             
             // If the LCD controller wants an interrupt, trigger it
             
