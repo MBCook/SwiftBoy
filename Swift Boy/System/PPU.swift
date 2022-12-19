@@ -68,7 +68,7 @@ private enum OAMAttributes {
 }
 
 private typealias OAMOffset = UInt8
-private typealias PixelCoordinate = UInt8
+private typealias PixelCoordinate = Int16       // We have to deal with negative numbers and numbers over 127, so UInt8 and Int8 won't work
 
 class PPU: MemoryMappedDevice {
     
@@ -97,13 +97,13 @@ class PPU: MemoryMappedDevice {
             _lcdStatus = value & 0x78
         }
     }
-    private var viewportY: PixelCoordinate
-    private var viewportX: PixelCoordinate
-    private var lcdYCoordinate: PixelCoordinate
+    private var viewportY: Register
+    private var viewportX: Register
+    private var lcdYCoordinate: Register
     private var lcdYCompare: Register
     private var backgroundPalette: Register
-    private var windowY: PixelCoordinate
-    private var windowX: PixelCoordinate
+    private var windowY: Register
+    private var windowX: Register
     
     // MARK: - Public interface
     
@@ -241,7 +241,7 @@ class PPU: MemoryMappedDevice {
         var sprites: [(OAMOffset, PixelCoordinate)] = []
         
         for offset in stride(from: 0, to: OAM_ENTRIES, by: BYTES_PER_OAM)  {
-            let spriteY = findSpriteYCoordinate(offset, lcdY: lcdYCoordinate)
+            let spriteY = findSpriteYCoordinate(offset, lcdY: Int16(lcdYCoordinate))
             
             if let spriteY {
                 // This line of the sprite needs displaying (unless it's off screen left or right, but that's not our problem)
@@ -255,6 +255,10 @@ class PPU: MemoryMappedDevice {
             }
         }
         
+        // When we process things we'll want them in sorted order by X coordinate, so do that now
+        
+        sprites.sort(by: self.spriteOrderSorter)
+        
         return sprites
     }
     
@@ -263,11 +267,11 @@ class PPU: MemoryMappedDevice {
             // The background is turned on, figure out the Y coordinate into the full background
             // Add the current Y position to the viewport offset then wrap to 256 becasue the background repeats
             
-            var result = lcdYCoordinate
+            var result = lcdYCoordinate + viewportY
             
             result &+= viewportY    // Wrap around on 256
             
-            return (viewportX, result)
+            return (Int16(viewportX), Int16(result))
         } else {
             // If the background is turned off we don't have a coordinate
             
@@ -275,11 +279,11 @@ class PPU: MemoryMappedDevice {
         }
     }
     
-    private func findWindowCoordinates() -> (Int16, PixelCoordinate)? {
+    private func findWindowCoordinates() -> (PixelCoordinate, PixelCoordinate)? {
         if lcdControl & LCDControl.windowEnable > 0 && lcdControl & LCDControl.bgWindowEnable > 0 {
             // The window is turned on, things always start at 0,0 so all that matters is what line we're on
             
-            return (Int16(windowX) - 7, lcdYCoordinate - windowY)   // Int 16 becasue the start can be negative or >127
+            return (Int16(windowX) - 7, Int16(lcdYCoordinate) - Int16(windowY))
         } else {
             // If the window is turned off we don't have a coordinate
             
@@ -287,23 +291,57 @@ class PPU: MemoryMappedDevice {
         }
     }
     
-    private func findSpriteYCoordinate(_ offset: OAMOffset, lcdY: PixelCoordinate) -> PixelCoordinate? {
-        let objectHeight = ((lcdControl & LCDControl.objectSize) > 0) ? 8 : 16
-        let objectStart = Int(oamRAM[Int(offset + OAM_Y_POSITION)]) - 16
+    private func findSpriteYCoordinate(_ sprite: OAMOffset, lcdY: PixelCoordinate) -> PixelCoordinate? {
+        let spriteHeight: Int16 = ((lcdControl & LCDControl.objectSize) > 0) ? 8 : 16
+        let spriteYStart = Int16(oamRAM[Int(sprite + OAM_Y_POSITION)]) - 16
         
-        if lcdY < objectStart {
+        if lcdY < spriteYStart {
             // Haven't gotten to a line in the sprite, so nil
             
             return nil
-        } else if lcdY >= objectStart + objectHeight {
+        } else if lcdY >= spriteYStart + spriteHeight {
             // We're past the bottom of the sprite, so nil
             
             return nil
         } else {
             // We can calculate the line
             
-            return UInt8(Int(lcdY) - objectStart)
+            return Int16(lcdY) - spriteYStart
         }
+    }
+    
+    private func findSpriteXCoordinate(_ sprite: OAMOffset, lcdX: PixelCoordinate) -> PixelCoordinate? {
+        let spriteXStart = getSpriteX(sprite)
+        
+        if lcdX < spriteXStart {
+            // Haven't gotten to it yet, so nil
+            
+            return nil
+        } else if lcdX >= spriteXStart + 8 {
+            // We're past the right of the sprite (always 8 pixels wide), so nil
+            
+            return nil
+        } else {
+            // We can calculate the X cooridinate in the sprite
+            
+            return lcdX - spriteXStart
+        }
+    }
+    
+    private func getSpriteX(_ sprite: OAMOffset) -> PixelCoordinate {
+        return Int16(oamRAM[Int(sprite + OAM_X_POSITION)]) - 8
+    }
+    
+    private func spriteOrderSorter(_ tupleA: (OAMOffset, PixelCoordinate), _ tupleB: (OAMOffset, PixelCoordinate)) -> Bool {
+        // Sort by the sprite X coordinates. If they're equal, the lower index goes first
+        
+        let (aOffset, _) = tupleA
+        let (bOffset, _) = tupleB
+        
+        let aX = getSpriteX(aOffset)
+        let bX = getSpriteX(bOffset)
+        
+        return aX < bX || (aX == bX && aOffset < bOffset)
     }
     
     // MARK: - MemoryMappedDevice protocol functions
