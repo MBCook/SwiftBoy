@@ -28,6 +28,7 @@ enum MemoryLocations {
     static let objectAttributeMemoryRange: ClosedRange<Address> = 0xFE00...0xFE9F
     
     static let ioRegisterRange: ClosedRange<Address> = 0xFF00...0xFF4B  // Range is larget on CGB, up to 7F
+    static let joypad: Address = 0xFF00
     static let serialData: Address = 0xFF01
     static let serialControl: Address = 0xFF02
     static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07
@@ -49,6 +50,7 @@ private enum MemorySection {
     case objectAttributeMemory
     case timerRegisters
     case ioRegisters
+    case joypad
     case lcdRegisters
     case dmaRegister
     case highRAM
@@ -65,19 +67,20 @@ class Memory {
     
     // MARK: - Our private data
     
-    private var cartridge: Cartridge    // A representation of the game cartridge
+    private let cartridge: Cartridge    // A representation of the game cartridge
     private var workRAM: Data           // Built in RAM for program operation
     private var highRAM: Data           // Tiny bit more RAM for programs to use, where the stack lives, and works during DMA
     private var ioRegisters: Data       // Other registers we don't handle properly yet, act like they're normal RAM
     
     // We also need some other objects we'll redirect memory access to
-    private var timer: MemoryMappedDevice
-    private var interruptController: InterruptController
-    private var ppu: PPU
+    private let timer: MemoryMappedDevice
+    private let interruptController: InterruptController
+    private let ppu: PPU
+    private let joypad: Joypad
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad) {
         // Allocate the various RAM banks built into the Game Boy
         
         workRAM = Data(count: Int(EIGHT_KB))
@@ -90,6 +93,7 @@ class Memory {
         self.timer = timer
         self.interruptController = interruptController
         self.ppu = ppu
+        self.joypad = joypad
     }
     
     subscript(index: Address) -> UInt8 {
@@ -117,6 +121,8 @@ class Memory {
                 return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
             case .ioRegisters:
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
+            case .joypad:
+                return joypad.readRegister(index)
             case .timerRegisters:
                 return timer.readRegister(index)
             case .highRAM:
@@ -163,6 +169,8 @@ class Memory {
                 workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
             case .ioRegisters:
                 ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
+            case .joypad:
+                joypad.writeRegister(index, value)
             case .timerRegisters:
                 timer.writeRegister(index, value)
             case .highRAM:
@@ -194,6 +202,8 @@ class Memory {
             return .timerRegisters
         case MemoryLocations.ioRegisterRange:
             return .ioRegisters
+        case MemoryLocations.joypad:
+            return .joypad
         case MemoryLocations.dmaRegister:
             return .dmaRegister
         case MemoryLocations.lcdRegisterRange:

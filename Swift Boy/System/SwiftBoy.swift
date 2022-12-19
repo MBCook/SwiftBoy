@@ -26,6 +26,7 @@ class SwiftBoy {
     private var timer: Timer
     private var interruptController: InterruptController
     private var ppu: PPU
+    private var joypad: Joypad
     
     private var logFile: FileHandle?
     
@@ -33,9 +34,10 @@ class SwiftBoy {
         let dmaController = DMAController()
         
         timer = Timer()
+        joypad = Joypad()
         interruptController = InterruptController()
         ppu = PPU(dmaController: dmaController)
-        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu)
+        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu, joypad: joypad)
         
         dmaController.setMemory(memory: memory)
         
