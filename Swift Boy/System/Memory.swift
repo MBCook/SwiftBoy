@@ -20,6 +20,9 @@ enum MemoryLocations {
     static let romBankStart: Address = 0x4000
     
     static let videoRAMRange: ClosedRange<Address> = 0x8000...0x9FFF
+    static let videoRAMHighBlock: Address = 0x9000
+    static let videoRAMLowTileMap: Address = 0x9800
+    static let videoRAMHighTileMap: Address = 0x9C00
     
     static let externalRAMRange: ClosedRange<Address> = 0xA000...0xBFFF
     
