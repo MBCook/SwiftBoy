@@ -43,16 +43,16 @@ private enum HaltStatus {
 class CPU {
     // MARK: - First our registers
     
-    private var a: Register
-    private var b: Register
-    private var c: Register
-    private var d: Register
-    private var e: Register
-    private var h: Register
-    private var l: Register
-    private var flags: Register
-    private var sp: Address
-    private var pc: Address
+    private var a: Register = 0
+    private var b: Register = 0
+    private var c: Register = 0
+    private var d: Register = 0
+    private var e: Register = 0
+    private var h: Register = 0
+    private var l: Register = 0
+    private var flags: Register = 0
+    private var sp: Address = 0
+    private var pc: Address = 0
     
     // MARK: - Combo registers, which require computed properties
     
@@ -95,16 +95,28 @@ class CPU {
     
     // MARK: - Other things we need to keep track of
     
-    private var haltStatus: HaltStatus              // If the CPU is waiting for an interrupt
-    private let memory: Memory                      // Represents all memory, knows the special addressing rules so we don't have to
-    private let interruptController: InterruptController    // So we can handle interrupts
-    private var ticks: UInt16                       // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
+    private let interruptController: InterruptController!   // So we can handle interrupts
+    private let memory: Memory!             // Represents all memory, knows the special addressing rules so we don't have to
+    private var haltStatus: HaltStatus!     // If the CPU is waiting for an interrupt
+    private var ticks: UInt16 = 0           // Increases at the instruction clock rate (1/4th the oscillator rate, 2^20 IPS), wraps
     
     // MARK: - Public interface
     
     // Init sets everything to the values expected once the startup sequence finishes running
     init(memory: Memory, interruptController: InterruptController) {
+        // Save references to the two objects we need to know about
+        
+        self.memory = memory
+        self.interruptController = interruptController
+        
+        // Set all the registers/etc to the startup values
+        
+        reset()
+    }
+    
+    func reset() {
         // You can find the default values in many places, https://bgb.bircd.org/pandocs.htm#powerupsequence holds a nice summary
+        
         a = 0x01
         b = 0x00
         c = 0x13
@@ -118,9 +130,6 @@ class CPU {
         haltStatus = .notHalted
         
         ticks = 0
-        
-        self.memory = memory
-        self.interruptController = interruptController
     }
     
     // Runs one instruction, returns how many ticks have passed

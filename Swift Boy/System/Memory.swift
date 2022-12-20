@@ -67,10 +67,10 @@ class Memory {
     
     // MARK: - Our private data
     
-    private let cartridge: Cartridge    // A representation of the game cartridge
-    private var workRAM: Data           // Built in RAM for program operation
-    private var highRAM: Data           // Tiny bit more RAM for programs to use, where the stack lives, and works during DMA
-    private var ioRegisters: Data       // Other registers we don't handle properly yet, act like they're normal RAM
+    private var cartridge: Cartridge!   // A representation of the game cartridge
+    private var workRAM: Data!          // Built in RAM for program operation
+    private var highRAM: Data!          // Tiny bit more RAM for programs to use, where the stack lives, and works during DMA
+    private var ioRegisters: Data!      // Other registers we don't handle properly yet, act like they're normal RAM
     
     // We also need some other objects we'll redirect memory access to
     private let timer: MemoryMappedDevice
@@ -81,19 +81,30 @@ class Memory {
     // MARK: Public methods
     
     init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad) {
+        // Save references to the other objects
+        
+        self.timer = timer
+        self.interruptController = interruptController
+        self.ppu = ppu
+        self.joypad = joypad
+        
+        // Load the game and reset our state
+        
+        loadGameAndReset(cartridge)
+    }
+    
+    func reset() {
         // Allocate the various RAM banks built into the Game Boy
         
         workRAM = Data(count: Int(EIGHT_KB))
         highRAM = Data(count: 128)
         ioRegisters = Data(count: 76)
-        
-        // Save references to the other objects
-        
+    }
+    
+    func loadGameAndReset(_ cartridge: Cartridge) {
         self.cartridge = cartridge
-        self.timer = timer
-        self.interruptController = interruptController
-        self.ppu = ppu
-        self.joypad = joypad
+        
+        reset()
     }
     
     subscript(index: Address) -> UInt8 {

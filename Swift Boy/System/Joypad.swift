@@ -22,23 +22,29 @@ class Joypad: MemoryMappedDevice {
     
     // NOTE: Joypad stuff is all active low. We'll keep everything normal (true = on) and alter our input/output to what a Game Boy does
     
-    private var upButton: Bool                          // The state of each button
-    private var downButton: Bool
-    private var leftButton: Bool
-    private var rightButton: Bool
-    private var bButton: Bool
-    private var aButton: Bool
-    private var selectButton: Bool
-    private var startButton: Bool
+    private var upButton = false                        // The state of each button
+    private var downButton = false
+    private var leftButton = false
+    private var rightButton = false
+    private var bButton = false
+    private var aButton = false
+    private var selectButton = false
+    private var startButton = false
     
-    private var actionSelected: Bool                    // If they're trying to find anything
-    private var directionSelected: Bool
+    private var actionSelected = false                  // If they're trying to find anything
+    private var directionSelected = false
     
-    private var buttonPressedSinceLastTick: Bool        // Used to track if we need to do a joypad interrupt
+    private var buttonPressedSinceLastTick = false      // Used to track if we need to do a joypad interrupt
     
     // MARK: - Public interface
     
     init() {
+        // Let's just say everything is unpressed
+        
+        reset()
+    }
+    
+    func reset() {
         // Just initialize everything as unpressed (false)
         
         upButton = false

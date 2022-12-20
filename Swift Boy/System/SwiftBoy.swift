@@ -21,7 +21,6 @@ class SwiftBoy {
     // MARK: - Our private variables
     
     private var cpu: CPU
-    private var cartridge: Cartridge
     private var memory: Memory
     private var timer: Timer
     private var interruptController: InterruptController
@@ -30,12 +29,19 @@ class SwiftBoy {
     
     private var logFile: FileHandle?
     
+    private var paused: Bool
+    
+    // MARK: - Our public interface
+    
     init(cartridge: Cartridge) throws {
-        let dmaController = DMAController()
+        // Create the various objects we need and wire them up
         
         timer = Timer()
         joypad = Joypad()
         interruptController = InterruptController()
+        
+        let dmaController = DMAController()
+        
         ppu = PPU(dmaController: dmaController)
         memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu, joypad: joypad)
         
@@ -43,11 +49,37 @@ class SwiftBoy {
         
         cpu = CPU(memory: memory, interruptController: interruptController)
         
-        self.cartridge = cartridge
+        paused = false
+    }
+    
+    func pause() {
+        paused = true
+    }
+    
+    func reset() {
+        // Just call reset on all the objects
+        
+        timer.reset()
+        joypad.reset()
+        interruptController.reset()
+        ppu.reset()
+        memory.reset()
+        cpu.reset()
+    }
+    
+    func loadGameAndReset(_ cartridge: Cartridge) {
+        // Just call reset on all the objects except memory, which gets the new cartridge
+        
+        timer.reset()
+        joypad.reset()
+        interruptController.reset()
+        ppu.reset()
+        memory.loadGameAndReset(cartridge)
+        cpu.reset()
     }
     
     // The main runloop
-    func run() -> Never {
+    func run() {
         // Make sure the log file will be closed if it exists
         
         defer {
@@ -74,6 +106,10 @@ class SwiftBoy {
             
             logFile = FileHandle(forWritingAtPath: path)
         }
+        
+        // We were asked to run, so paused needs to be false
+        
+        paused = false
         
         // Inform the populace!
         
@@ -111,6 +147,13 @@ class SwiftBoy {
                     print("Error writing to log file! \(error.localizedDescription)")
                     exit(1)
                 }
+            }
+            
+            // We about to do the next instruction. Don't do that if we need to pause
+            
+            if paused {
+                print("Pausing")
+                return
             }
             
             // Ok then, we need to execute the next opcode

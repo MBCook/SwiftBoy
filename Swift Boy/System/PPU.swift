@@ -74,18 +74,18 @@ class PPU: MemoryMappedDevice {
     
     // MARK: - Our private data
     
-    private var videoRAM: Data                  // Built in RAM to hold sprites and tiles
-    private var oamRAM: Data                    // RAM that controls sprite/timemap display
+    private var videoRAM: Data!                 // Built in RAM to hold sprites and tiles
+    private var oamRAM: Data!                   // RAM that controls sprite/timemap display
     
-    private var ppuMode: Register               // Current PPU mode
-    private var ticksIntoLine: UInt16
+    private var ppuMode: Register = 0           // Current PPU mode
+    private var ticksIntoLine: UInt16 = 0
     
     private var dmaController: DMAController    // The DMA controller only exists to help the PPU by moving data fast
     
     // MARK: - Our registers
     
-    private var lcdControl: Register
-    private var _lcdStatus: Register            // The REAL LCD status register
+    private var lcdControl: Register = 0
+    private var _lcdStatus: Register = 0        // The REAL LCD status register
     private var lcdStatus: Register {           // The fake one to handle making reads and writes easy
         get {
             // We don't really store the current mode in the register, so add it in on read
@@ -97,25 +97,31 @@ class PPU: MemoryMappedDevice {
             _lcdStatus = value & 0x78
         }
     }
-    private var viewportY: Register
-    private var viewportX: Register
-    private var lcdYCoordinate: Register
-    private var lcdYCompare: Register
-    private var backgroundPalette: Register
-    private var windowY: Register
-    private var windowX: Register
+    private var viewportY: Register = 0
+    private var viewportX: Register = 0
+    private var lcdYCoordinate: Register = 0
+    private var lcdYCompare: Register = 0
+    private var backgroundPalette: Register = 0
+    private var windowY: Register = 0
+    private var windowX: Register = 0
     
     // MARK: - Public interface
     
     init(dmaController: DMAController) {
+        // Save references to the other objects
+        
+        self.dmaController = dmaController
+        
+        // Setup the rest the way it is on startup
+        
+        reset()
+    }
+    
+    func reset() {
         // Setup the bits of RAM we control
         
         videoRAM = Data(count: Int(EIGHT_KB))
         oamRAM = Data(count: 160)
-        
-        // Save references to the other objects
-        
-        self.dmaController = dmaController
         
         // Setup our registers based on what the boot ROM would
         
@@ -137,6 +143,10 @@ class PPU: MemoryMappedDevice {
         lcdYCompare = 0x00
         windowY = 0x00
         windowX = 0x00
+        
+        // Tell the DMA controller that we own to reset
+        
+        dmaController.reset()
     }
     
     func dmaInProgress() -> Bool {

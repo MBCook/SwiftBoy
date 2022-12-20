@@ -19,8 +19,8 @@ class Timer: MemoryMappedDevice {
     
     // MARK: - Our private data
     
-    private var lastDivRegisterIncrement: UInt8         // The last time the DIV register was incremented
-    private var lastTimerRegisterIncrement: UInt16      // The last time the counter was incremented
+    private var lastDivRegisterIncrement: UInt8 = 0         // The last time the DIV register was incremented
+    private var lastTimerRegisterIncrement: UInt16 = 0      // The last time the counter was incremented
     
     private let TICKS_PER_DIV = 64
     private let CLOCK_DIVISOR_MASK: UInt8 = 0x03
@@ -32,14 +32,20 @@ class Timer: MemoryMappedDevice {
     
     // MARK: - Our registers
     
-    private var divRegister: Register
-    private var timerCounter: Register
-    private var timerModulo: Register
-    private var timerControl: Register
+    private var divRegister: Register = 0
+    private var timerCounter: Register = 0
+    private var timerModulo: Register = 0
+    private var timerControl: Register = 0
     
     // MARK: - Public interface
     
     init() {
+        // Initialize things to their startup value
+        
+        reset()
+    }
+    
+    func reset() {
         // Just initialize everything to 0x00, that's what the hardware does
         
         lastDivRegisterIncrement = 0
@@ -48,7 +54,7 @@ class Timer: MemoryMappedDevice {
         timerCounter = 0
         timerModulo = 0
         timerControl = 0
-    }
+    }    
     
     func tick(_ ticks: Ticks) -> InterruptSource? {
         // Handle each part of the clock independently. First the div register, which is always counting up.

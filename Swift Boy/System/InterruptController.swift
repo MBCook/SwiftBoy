@@ -18,15 +18,23 @@ case joypad = 0x10
 class InterruptController: MemoryMappedDevice {
     // Private variables
     
-    private var globalEnable: Bool
-    private var enabledInterrupts: Register
-    private var raisedInterrupts: Register
+    private var globalEnable: Bool = false
+    private var enabledInterrupts: Register = 0
+    private var raisedInterrupts: Register = 0
     
     private let INTERRUPT_HANDLER_BASE: Address = 0x0040
     
     // MARK: - Our public interface
     
     init() {
+        // Set the registers to their initial state
+        
+        reset()
+    }
+    
+    func reset() {
+        // Set the registers to their initial state
+        
         globalEnable = false
         enabledInterrupts = 0x00
         raisedInterrupts = 0x00

@@ -11,13 +11,21 @@ class DMAController: MemoryMappedDevice {
     
     // MARK: - Our private data
     
-    private var memory: Memory?     // In reality will always be set, not setting is an invalid configuration, we need it to copy data
-    private var lastSource: UInt8
-    private var ticksLeft: UInt8
+    private var memory: Memory!         // In reality will always be set, not setting is an invalid configuration, we need it to copy data
+    private var lastSource: UInt8 = 0   // Where we last copied from (high byte)
+    private var ticksLeft: UInt8 = 0    // How much longer the copy will continue for
     
     // MARK: - Public interface
     
     init() {
+        // Just do a reset
+        
+        reset()
+    }
+    
+    func reset() {
+        // Put things back to a sane default
+        
         lastSource = 0x00
         ticksLeft = 0
     }
@@ -47,16 +55,16 @@ class DMAController: MemoryMappedDevice {
     // MARK: - MemoryMappedDevice protocol functions
     
     func readRegister(_ address: Address) -> UInt8 {
+        guard address == MemoryLocations.dmaRegister else {
+            fatalError("The joypad should not have been asked to read memory address 0x\(toHex(address))")
+        }
+        
         return lastSource
     }
     
     func writeRegister(_ address: Address, _ value: UInt8) {
-        guard memory != nil else {
-            fatalError("DMA controller doesn't have a link to memory")
-        }
-        
         guard address == MemoryLocations.dmaRegister else {
-            return
+            fatalError("The joypad should not have been asked to set memory address 0x\(toHex(address))")
         }
         
         // When they write a value to our register, we copy 160 bytes from 0x(value)00 to 0xFE00
