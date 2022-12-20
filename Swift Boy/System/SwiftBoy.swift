@@ -83,8 +83,8 @@ class SwiftBoy {
         // Make sure the log file will be closed if it exists
         
         defer {
-            if logFile != nil {
-                try! logFile!.close()
+            if let logFile {
+                try! logFile.close()
             }
         }
         
