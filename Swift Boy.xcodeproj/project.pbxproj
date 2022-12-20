@@ -23,6 +23,7 @@
 		4C35B952293C291600D4EEA0 /* CPU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B951293C291600D4EEA0 /* CPU.swift */; };
 		4C35B954293C2AEF00D4EEA0 /* Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B953293C2AEF00D4EEA0 /* Memory.swift */; };
 		4C4A820D295002D300D0ECBE /* Joypad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4A820C295002D300D0ECBE /* Joypad.swift */; };
+		4C4A8211295144D400D0ECBE /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C4A8210295144D400D0ECBE /* GameController.framework */; };
 		4C92EA14294D52F800412D30 /* DMAController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C92EA13294D52F800412D30 /* DMAController.swift */; };
 /* End PBXBuildFile section */
 
@@ -46,6 +47,8 @@
 		4C35B951293C291600D4EEA0 /* CPU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPU.swift; sourceTree = "<group>"; };
 		4C35B953293C2AEF00D4EEA0 /* Memory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
 		4C4A820C295002D300D0ECBE /* Joypad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Joypad.swift; sourceTree = "<group>"; };
+		4C4A820E295144CA00D0ECBE /* Swift-Boy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Swift-Boy-Info.plist"; sourceTree = SOURCE_ROOT; };
+		4C4A8210295144D400D0ECBE /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		4C92EA13294D52F800412D30 /* DMAController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMAController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -54,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C4A8211295144D400D0ECBE /* GameController.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,6 +80,7 @@
 				4C35B94F293C26B500D4EEA0 /* README.md */,
 				4C35B93F293C263800D4EEA0 /* Swift Boy */,
 				4C35B93E293C263800D4EEA0 /* Products */,
+				4C4A820F295144D400D0ECBE /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -90,6 +95,7 @@
 		4C35B93F293C263800D4EEA0 /* Swift Boy */ = {
 			isa = PBXGroup;
 			children = (
+				4C4A820E295144CA00D0ECBE /* Swift-Boy-Info.plist */,
 				4C35B950293C290900D4EEA0 /* System */,
 				4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */,
 				4C35B942293C263800D4EEA0 /* ContentView.swift */,
@@ -124,6 +130,14 @@
 				4C92EA13294D52F800412D30 /* DMAController.swift */,
 			);
 			path = System;
+			sourceTree = "<group>";
+		};
+		4C4A820F295144D400D0ECBE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				4C4A8210295144D400D0ECBE /* GameController.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -346,6 +360,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Swift Boy/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Swift-Boy-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -373,6 +388,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"Swift Boy/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Swift-Boy-Info.plist";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

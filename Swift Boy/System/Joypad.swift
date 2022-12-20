@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GameController
 
 private enum JoypadBits {
     static let actionButtons: Bitmask = 0x20
@@ -39,6 +40,10 @@ class Joypad: MemoryMappedDevice {
     // MARK: - Public interface
     
     init() {
+        // Tell the OS to start watching for game controllers
+        
+        GCController.startWirelessControllerDiscovery()
+        
         // Let's just say everything is unpressed
         
         reset()
@@ -65,7 +70,7 @@ class Joypad: MemoryMappedDevice {
     func tick(_ ticks: Ticks) -> InterruptSource? {
         // We only care that time moved to trigger interrupts
         
-        if buttonPressedSinceLastTick && (actionSelected || directionSelected) {
+        if buttonPressedSinceLastTick {
             buttonPressedSinceLastTick = false
             
             return .joypad
@@ -74,13 +79,50 @@ class Joypad: MemoryMappedDevice {
         }
     }
     
-    // TODO: A function for something external to the core emulator to tell us that a button was pressed
+    // MARK: - Private functions
+    
+    private func readJoystick() {
+        if let controller = GCController.current?.extendedGamepad {
+            // The right kind of controller is connected. Update the states of the buttons they asked for
+            
+            if directionSelected {
+                updateButton(&upButton, to: controller.dpad.up.isPressed)
+                updateButton(&downButton, to: controller.dpad.down.isPressed)
+                updateButton(&leftButton, to: controller.dpad.left.isPressed)
+                updateButton(&rightButton, to: controller.dpad.right.isPressed)
+            } else if actionSelected {
+                updateButton(&selectButton, to: controller.buttonOptions?.isPressed ?? false)   // If there is no options button, uh oh
+                updateButton(&startButton, to: controller.buttonMenu.isPressed)
+                updateButton(&bButton, to: controller.buttonA.isPressed)    // Apple used Xbox names, which is backwards of Nintendo
+                updateButton(&aButton, to: controller.buttonB.isPressed)
+            }
+        }
+    }
+    
+    private func updateButton(_ button: inout Bool, to: Bool) {
+        if button == false && to == true {
+            // A button was pressed, signal an interrupt on the next tick
+            
+            buttonPressedSinceLastTick = true
+        }
+        
+        // Save the new state
+        
+        button = to
+    }
     
     // MARK: - MemoryMappedDevice protocol functions
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
         case MemoryLocations.joypad:
+            // When they read this register, they want the actual results.
+            // So if one of the select bits is on we'll read the state of the joystick right now.
+            
+            if actionSelected || directionSelected {
+                readJoystick()
+            }
+            
             // They want the state of everything. Build it up and then invert it so it looks the way ROMs expect
             
             var result = UInt8(0x00)
