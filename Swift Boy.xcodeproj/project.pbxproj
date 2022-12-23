@@ -120,14 +120,14 @@
 				4C318A8629455C3F006F9377 /* Mappers */,
 				4C318A8229455292006F9377 /* CartridgeHelper.swift */,
 				4C35B951293C291600D4EEA0 /* CPU.swift */,
+				4C92EA13294D52F800412D30 /* DMAController.swift */,
 				4C13DD4A2941622B00C8786C /* InterruptController.swift */,
+				4C4A820C295002D300D0ECBE /* Joypad.swift */,
 				4C35B953293C2AEF00D4EEA0 /* Memory.swift */,
+				4C318A8B2946B272006F9377 /* PPU.swift */,
 				4C13DD4C294168B900C8786C /* SwiftBoy.swift */,
 				4C13DD4829415F1300C8786C /* Timer.swift */,
-				4C4A820C295002D300D0ECBE /* Joypad.swift */,
 				4C13DD4E29416BD800C8786C /* Utility.swift */,
-				4C318A8B2946B272006F9377 /* PPU.swift */,
-				4C92EA13294D52F800412D30 /* DMAController.swift */,
 			);
 			path = System;
 			sourceTree = "<group>";

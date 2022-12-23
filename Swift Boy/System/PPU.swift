@@ -203,6 +203,10 @@ class PPU: MemoryMappedDevice {
                 ppuMode = LCDMode.verticalBlank
                 
                 needsInterrupt = (lcdStatus & LCDStatus.vBankInterruptSource) > 0  // Flag interrupt if needed
+                
+                if CONSOLE_DISPLAY {
+                    print(String(repeating: "-", count: 160))
+                }
             } else if ppuMode != LCDMode.verticalBlank {
                 // Just a normal new line when not in the vertical blank
                 
@@ -219,7 +223,15 @@ class PPU: MemoryMappedDevice {
                 
                 ppuMode = LCDMode.drawingToLCD
                 
-                drawLine()
+                let colorData = drawLine()
+                
+                if CONSOLE_DISPLAY {
+                    let colors = [" ", "░", "▒", "▓"]
+                    
+                    let colorCharacters = colorData.map({colors[Int($0)]}).joined()
+                    
+                    print(colorCharacters)
+                }
             } else if ticksIntoLine > 252 && ppuMode != LCDMode.horizontablBlank {
                 // Transition to Horizontal Blank
                 
@@ -242,11 +254,245 @@ class PPU: MemoryMappedDevice {
         return needsInterrupt ? .lcdStat : nil
     }
     
-    // MARK: - Private methods
+    // MARK: - Private methods for rending a line of pixels
     
-    private func drawLine() {
-        // TODO: This
+    private func drawLine() -> [FinalColor] {
+        // We have functions to render everything we should need, we just need to put the pieces together.
+        // Let's gather the data we'll need and take the built in offsets into account
+        
+        let backgroundStart = viewportX
+        let windowStart = Int(windowX) - 7
+        
+        var (bgColors, bgWasZero) = getFullBackgroundWindowLine(line: findBackgroundYCoordinate(), background: true) ?? (nil, nil)
+        var (windowColors, windowWasZero) = getFullBackgroundWindowLine(line: findWindowYCoordinate(), background: false) ?? (nil, nil)
+        let (spriteColors, backgroundPriority) = getFullSpritesLine()
+        
+        // Based on positioning, we may need to expand our background because it repeats (if it's there)
+        // Either way extract the 160 elements we need from the array
+        
+        if bgColors != nil && Int(backgroundStart) + 160 > 255 {
+            // OK, the bakcground will need to wrap because the viewport goes off the side.
+            // To do that just append copies of the arrays after themselves. Nice and easy.
+            
+            bgColors!.append(contentsOf: bgColors!)
+            bgWasZero!.append(contentsOf: bgWasZero!)
+        }
+        
+        if bgColors != nil {
+            bgColors = Array(bgColors!.dropFirst(Int(backgroundStart)).prefix(160))
+            bgWasZero = Array(bgWasZero!.dropFirst(Int(backgroundStart)).prefix(160))
+        }
+        
+        // Now we do the window. We'll have to add elements if the position isn't 0 (after we fixed the offset above).
+        // Then either way take the 160 pixels we need if the window exists.
+        
+        if windowColors != nil && windowStart < 0 {
+            // Window starts before the screen, so add extra elements on the end so when we take 160 there are enough.
+            
+            windowColors!.append(contentsOf: Array(repeating: 0, count: abs(windowStart)))
+            windowWasZero!.append(contentsOf: Array(repeating: true, count: abs(windowStart)))
+        } else if windowColors != nil && windowStart > 0 {
+            // The window doesn't start at pixel 0, so we'll need extra elements on the front
+            
+            windowColors!.insert(contentsOf: Array(repeating: 0, count: windowStart), at:0)
+            windowWasZero!.insert(contentsOf: Array(repeating: true, count: windowStart), at:0)
+        }
+        
+        // We have enough elements on both arrays (if needed) we can take pixels from them without worry of causing an exception
+        
+        var finalPixels = Array(repeating: LCDColors.white, count: 160)     // Initial value before we combine things
+        
+        for x in 0..<160 {
+            let bgWindowColor = windowColors?[x] ?? bgColors?[x]        // Window if we have it, BG if not, nil if neither
+            let bgWindowWasZero = windowWasZero?[x] ?? bgWasZero?[x]    // Same thing with if the color was zero
+            let spriteColor = spriteColors[x]                           // The sprite pixel if there is one
+            let spriteBGPriority = backgroundPriority[x]                // If that sprite pixel has BG priority on it
+            
+            // What we do depends on if there is background priority
+            
+            if spriteBGPriority && bgWindowWasZero == true {
+                // A non-zero background or window pixel will cover the sprite. Since bgWindowWasZero is not nil, the color won't be
+                
+                finalPixels[x] = bgWindowColor!
+            } else if let spriteColor {
+                // The sprite has priority, or the background/window was index 0 which is always behind the sprite
+                
+                finalPixels[x] = spriteColor
+            } else if let bgWindowColor {
+                // Last chance. No sprite pixel (or it was transparent) so it's background/window time.
+                // If those are off, the default white color we set when creating the array wins.
+                
+                finalPixels[x] = bgWindowColor
+            }
+        }
+        
+        return finalPixels
     }
+    
+    private func getFullBackgroundWindowLine(line: LineNumber?, background: Bool) -> ([FinalColor], [Bool])? {
+        guard line != nil else {
+            return nil
+        }
+        
+        // First we need the tile map data base address
+        
+        let tileMapArea = lcdControl & (background ? LCDControl.bgTilemapArea : LCDControl.windowTilemapArea)
+        let baseAddress = tileMapArea > 0 ? MemoryLocations.videoRAMHighTileMap : MemoryLocations.videoRAMLowTileMap
+        
+        // We were given a y coordinates against the 256x256 map
+        // Tiles are 8x8 so figure out while tile (vertically) we're in
+        
+        let yTile = line! / 8
+        
+        // Now we can loop across the whole 32 tile/256 pixel background and generate a color array
+        // This is not how the Game Boy does it (it goes one pixel at a time and only the necessary pixels)
+        // but this is easy and we have plenty of processor to spare. A later step can crop and mix things as needed.
+        
+        var finalColors: [FinalColor] = []  // The final color of each pixel after applying the palette
+        var colorWasZero: [Bool] = []       // If the color index of the background pixel (before palette) was 0
+        
+        for x in 0..<32 {
+            let mapIndex = UInt16(yTile) * 32 + UInt16(x)
+            
+            // With that index we can get the index into the tile set to get data for
+            
+            let tileIndex = videoRAM[Int(baseAddress + mapIndex - MemoryLocations.videoRAMRange.lowerBound)]
+            
+            // With that index we can get the address for the actual data, figure out the color indexes, and apply the fixed palette
+            
+            let dataAddress = getBackgroundWindowAddress(tileIndex)
+            let colorIndexes = findColorData(line: line! % 8, baseAddress: dataAddress)
+            
+            // We're going to return two arrays. The first is the final colors of the line, the second is which color(s) were index 0.
+            // We need to know the index 0 stuff for the "background over sprite" option
+            
+            finalColors.append(contentsOf: applyPalette(backgroundPalette, colorIndexes,
+                                                        transparency: false).map({$0!}))    // There will be no nils, so force unwrap is OK
+            colorWasZero.append(contentsOf: colorIndexes.map({$0 == 0}))
+        }
+        
+        return (finalColors, colorWasZero)
+    }
+    
+    private func getFullSpritesLine() -> ([FinalColor?], [Bool]) {
+        // Let's get the sprites on our line
+        
+        let spritesOnLine = findSpritesForLine()
+        
+        // Now we can loop across the whole 160 pixel resolution finding what sprite and pixel (if any) are on that column
+        // This is roughly how the real Game Boy does it. After applying the palette nil will represent transparent.
+        // We'll also return a boolean array indicating which pixels have the background over sprite property set.
+        
+        var finalColors: [FinalColor?] = Array(repeating: nil, count: 160)      // The final color of each pixel after applying the palette
+        var backgroundPriority: [Bool] = Array(repeating: false, count: 160)    // If the pixel has background over sprite set
+        
+        guard spritesOnLine.count > 0 else {
+            // If there are no sprites we're already done
+            
+            return (finalColors, backgroundPriority)
+        }
+        
+        // Let's render each sprite into a little array so we can easily pixel-peek at it and put it in a dictionary.
+        // We'll do the same with other data
+        
+        var spriteData: [OAMOffset:[FinalColor?]] = [:]
+        var spriteBGPriority: [OAMOffset:Bool] = [:]
+        var spriteColumnRange: [OAMOffset:Range<Int16>] = [:]
+        
+        for (sprite, line) in spritesOnLine {
+            let startX = findSpriteX(sprite)
+            let endX = startX + 8
+            
+            spriteData[sprite] = getIndividualSpriteLine(line: line, sprite: sprite)
+            spriteBGPriority[sprite] = oamRAM[Int(sprite + OAM_ATTRIBUTES)] & OAMAttributes.backgroundWindowOverObject > 0
+            spriteColumnRange[sprite] = startX..<endX
+        }
+        
+        // OK, now we can look at each column and find our final pixel
+        
+        for x in 0..<160 {
+            // First, find every sprite with a bounding box covering this pixel
+            
+            let spritesInColumn = spritesOnLine.filter({spriteColumnRange[$0.0]!.contains(Int16(x))})
+            
+            // Go through each one in turn (they're in priority order) looking for a non-nil pixel
+            
+            for (sprite, _) in spritesInColumn {    // If no sprites are in this column, nothing happens. That's fine.
+                let itsRange = spriteColumnRange[sprite]!
+                let itsColors = spriteData[sprite]!
+                
+                if let color = itsColors[x - Int(itsRange.lowerBound)] {
+                    // We found a pixel! We're done. Record what we need then break the loop.
+                    
+                    finalColors[x] = color
+                    backgroundPriority[x] = spriteBGPriority[sprite]!
+                    
+                    break
+                }
+            }
+        }
+        
+        return (finalColors, backgroundPriority)
+    }
+    
+    private func getIndividualSpriteLine(line: LineNumber, sprite: OAMOffset) -> [FinalColor?] {
+        // Find the flags, the tile, and the base data address for the tile data
+        
+        let oamFlags = oamRAM[Int(sprite + OAM_ATTRIBUTES)]
+        let spriteTile = oamRAM[Int(sprite + OAM_TILE_INDEX)]
+        
+        let dataAddress = getSpriteAddress(spriteTile)
+        
+        // We need to figure out the real line, which can be different on vertical flip
+        
+        let height: UInt8 = lcdControl & LCDControl.objectSize > 0 ? 16 : 8
+        let vFlip = oamFlags & OAMAttributes.yFlip > 0
+        let hFlip = oamFlags & OAMAttributes.xFlip > 0
+        
+        let realLine = vFlip ? height - line : line
+        
+        // From there we can get the color indexes
+        
+        var colorIndexes = findColorData(line: realLine, baseAddress: dataAddress)
+        
+        if hFlip {
+            // If we need to do a horizontal flip, just reverse the pixels on the line
+            colorIndexes.reverse()
+        }
+        
+        // Now we can figure out the palette and apply it
+        
+        let palette = oamFlags & OAMAttributes.paletteNumber > 0 ? spritePaletteOne : spritePaletteZero
+        let colors = applyPalette(palette, colorIndexes, transparency: true)
+        
+        // Do we need to flip horizontally?
+        
+        return oamFlags & OAMAttributes.xFlip > 0 ? colors.reversed() : colors
+    }
+    
+    private func findColorData(line: LineNumber, baseAddress: Address) -> [ColorIndex] {
+        // The Game Boy stores sprites/tile pictures in two sequential bitplanes in memory. First the low bits, then the high bits
+        
+        let adjustedBase = Int(baseAddress - MemoryLocations.videoRAMRange.lowerBound + 2 * UInt16(line))
+        
+        let highBits = videoRAM[adjustedBase + 1]
+        let lowBits = videoRAM[adjustedBase]
+        
+        // Now we can walk through the bits, high to low, to go left to right to get the color indexes by combining bits
+        
+        var result: [ColorIndex] = []
+        
+        for i in stride(from: 7, through: 0, by: -1) {
+            let lowBit = lowBits >> i & 0x01
+            let highBit = (highBits >> i & 0x01) * 2
+            
+            result.append(highBit + lowBit)
+        }
+                
+        return result
+    }
+    
+    // MARK: - Private methods to find data we need
     
     private func findSpritesForLine() -> [(OAMOffset, LineNumber)] {
         // Find the first 10 sprites on the current line, returning (OAM offset, sprite line) so we can draw them
@@ -283,37 +529,33 @@ class PPU: MemoryMappedDevice {
         return sprites
     }
     
-    private func findBackgroundCoordinates() -> (ColumnNumber, LineNumber)? {
-        if lcdControl & LCDControl.bgWindowEnable > 0 {
-            // The background is turned on. The viewport registers tell us the BG coordinates of the upper left corner.
-            // So given the line we're currently on, figure out the line into the background.
-            // Note that the background repeats so we have to wrap around on 256 (32 tiles * 8 pixels high)
-            
-            let result = lcdYCoordinate &+ viewportY    // Wrap around on 256
-            
-            return (viewportX, result)    // X pixel in BG the line starts on for display, Y line in BG we're on.
-        } else {
-            // If the background is turned off we don't have a coordinate
-            
+    private func findBackgroundYCoordinate() -> LineNumber? {
+        guard lcdControl & LCDControl.bgWindowEnable > 0 else {
+            // If the background is off, we don't need to do anything
             return nil
         }
+    
+        // The viewport registers tell us the BG coordinates of the upper left corner.
+        // So given the line we're currently on, figure out the line into the background.
+        // Note that the background repeats so we have to wrap around on 256 (32 tiles * 8 pixels high)
+        
+        return lcdYCoordinate &+ viewportY    // Wrap around on 256
     }
     
-    private func findWindowCoordinates() -> (ColumnNumber, LineNumber)? {
-        if lcdControl & LCDControl.windowEnable == 0 || lcdControl & LCDControl.bgWindowEnable == 0 {
-            // If the window is turned off we don't have a coordinate
-            
+    private func findWindowYCoordinate() -> LineNumber? {
+        guard lcdControl & LCDControl.bgWindowEnable > 0 && lcdControl & LCDControl.windowEnable > 0 else {
+            // If the window is off, we don't need to do anything
             return nil
-        } else if windowY < lcdYCoordinate {
-            // If we haven't reached the window start, we're not ready to be shown yet
-            
-            return nil
-        } else {
-            // The window is fixed to the top-left of it's tile map, the thing you change is where the window appears on screen.
-            // That means the start of the window (on it's tile map, for fetching purposes) is always an X of 0
-
-            return (0, lcdYCoordinate - windowY)
         }
+        
+        guard windowY >= lcdYCoordinate else {
+            // We haven't gotten low enough for the window to show yet
+            return nil
+        }
+        
+        // The window is fixed to the top-left of it's tile map, the thing you change is where the window appears on screen.
+
+        return lcdYCoordinate - windowY
     }
     
     private func findSpriteYCoordinate(_ sprite: OAMOffset, lcdY: LineNumber) -> LineNumber? {
@@ -335,25 +577,7 @@ class PPU: MemoryMappedDevice {
         }
     }
     
-    private func findSpriteXCoordinate(_ sprite: OAMOffset, column: ColumnNumber) -> ColumnNumber? {
-        let spriteXStart = getSpriteX(sprite)
-        
-        if column < spriteXStart {
-            // Haven't gotten to it yet, so nil
-            
-            return nil
-        } else if column >= spriteXStart &+ 8 {
-            // We're past the right of the sprite (always 8 pixels wide), so nil
-            
-            return nil
-        } else {
-            // We can calculate the column in the sprite. It's just LCD column - sprite X coordinate
-            
-            return UInt8(Int16(column) - spriteXStart)
-        }
-    }
-    
-    private func getSpriteX(_ sprite: OAMOffset) -> PixelCoordinate {
+    private func findSpriteX(_ sprite: OAMOffset) -> PixelCoordinate {
         return Int16(oamRAM[Int(sprite + OAM_X_POSITION)]) - 8
     }
     
@@ -363,11 +587,13 @@ class PPU: MemoryMappedDevice {
         let (aOffset, _) = tupleA
         let (bOffset, _) = tupleB
         
-        let aX = getSpriteX(aOffset)
-        let bX = getSpriteX(bOffset)
+        let aX = findSpriteX(aOffset)
+        let bX = findSpriteX(bOffset)
         
         return aX < bX || (aX == bX && aOffset < bOffset)
     }
+    
+    // MARK: - Private methods to help us find stuff in memory
     
     private func getSpriteAddress(_ index: UInt8) -> Address {
         return MemoryLocations.videoRAMRange.lowerBound + UInt16(index) * 8
@@ -381,82 +607,7 @@ class PPU: MemoryMappedDevice {
         return UInt16(base + offset * 8)
     }
     
-    private func getBackgroundWindowLine(xInMap: ColumnNumber, yInMap: LineNumber, background: Bool) -> [FinalColor] {
-        // First we need the tile map data base address
-        
-        let tileMapArea = lcdControl & (background ? LCDControl.bgTilemapArea : LCDControl.windowTilemapArea)
-        let baseAddress = tileMapArea > 0 ? MemoryLocations.videoRAMHighTileMap : MemoryLocations.videoRAMLowTileMap
-        
-        // We were given x/y coordinates against the 256x256 map
-        // Tiles are 8x8 so figure out the tile index into the 32x32 tile map
-        
-        let tileNumber = UInt16(yInMap) / (8 * 32) + UInt16(xInMap) / 8
-        
-        // That lets us find the index of the tile to get the visual data from
-        
-        let tileIndex = videoRAM[Int(baseAddress + tileNumber - MemoryLocations.videoRAMRange.lowerBound)]
-        
-        // With that index we can get the address for the actual data, figure out the color indexes, and apply the fixed palette
-        
-        let dataAddress = getBackgroundWindowAddress(tileIndex)
-        let colorIndexes = getLineColorIndexes(line: yInMap % 8, baseAddress: dataAddress)
-        
-        return applyPalette(backgroundPalette, colorIndexes, transparency: false).map({$0!})    // There will be no nils, so force unwrap
-    }
-    
-    private func getSpriteLine(line: LineNumber, sprite: OAMOffset) -> [FinalColor?] {
-        // Find the flags, the tile, and the base data address for the tile data
-        
-        let oamFlags = oamRAM[Int(sprite + OAM_ATTRIBUTES)]
-        let spriteTile = oamRAM[Int(sprite + OAM_TILE_INDEX)]
-        
-        let dataAddress = getSpriteAddress(spriteTile)
-        
-        // We need to figure out the real line, which can be different on vertical flip
-        
-        let height: UInt8 = lcdControl & LCDControl.objectSize > 0 ? 16 : 8
-        let vFlip = oamFlags & OAMAttributes.yFlip > 0
-        let hFlip = oamFlags & OAMAttributes.xFlip > 0
-        
-        let realLine = vFlip ? height - line : line
-        
-        // From there we can get the color indexes
-        
-        var colorIndexes = getLineColorIndexes(line: realLine, baseAddress: dataAddress)
-        
-        if hFlip {
-            // If we need to do a horizontal flip, just reverse the pixels on the line
-            colorIndexes.reverse()
-        }
-        
-        // Now we can figure out the palette and apply it
-        
-        let palette = oamFlags & OAMAttributes.paletteNumber > 0 ? spritePaletteOne : spritePaletteZero
-        
-        return applyPalette(palette, colorIndexes, transparency: true)
-    }
-    
-    private func getLineColorIndexes(line: LineNumber, baseAddress: Address) -> [ColorIndex] {
-        // The Game Boy stores sprites/tile pictures in two sequential bitplanes in memory. First the low bits, then the high bits
-        
-        let adjustedBase = Int(baseAddress - MemoryLocations.videoRAMRange.lowerBound + 2 * UInt16(line))
-        
-        let highBits = videoRAM[adjustedBase + 1]
-        let lowBits = videoRAM[adjustedBase]
-        
-        // Now we can walk through the bits, high to low, to go left to right to get the color indexes by combining bits
-        
-        var result: [ColorIndex] = []
-        
-        for i in stride(from: 7, through: 0, by: -1) {
-            let lowBit = lowBits >> i & 0x01
-            let highBit = (highBits >> i & 0x01) * 2
-            
-            result.append(highBit + lowBit)
-        }
-                
-        return result
-    }
+    // MARK: - Other private drawing helper methods
     
     private func applyPalette(_ palette: Register, _ indexes: [ColorIndex], transparency: Bool) -> [FinalColor?] {
         // Make a conversion table from the palette register so our life is easy

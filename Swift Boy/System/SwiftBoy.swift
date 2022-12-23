@@ -15,7 +15,8 @@ typealias RegisterPair = UInt16
 typealias Ticks = UInt8
 
 let GAMEBOY_DOCTOR = false
-let BLARGG_TEST_ROMS = true
+let BLARGG_TEST_ROMS = false
+let CONSOLE_DISPLAY = true
 
 class SwiftBoy {
     // MARK: - Our private variables
