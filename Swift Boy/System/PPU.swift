@@ -604,7 +604,7 @@ class PPU: MemoryMappedDevice {
         let base = Int(spriteStyleAddressing ? MemoryLocations.videoRAMRange.lowerBound : MemoryLocations.videoRAMHighBlock)
         let offset = spriteStyleAddressing ? Int(index) : Int(Int8(bitPattern: index))
         
-        return UInt16(base + offset * 8)
+        return UInt16(base + offset * 16)   // 8 lines * 2 bitplanes
     }
     
     // MARK: - Other private drawing helper methods
