@@ -36,7 +36,6 @@ enum MemoryLocations {
     static let serialControl: Address = 0xFF02
     static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07
     static let interruptFlags: Address = 0xFF0F
-    
     static let lcdRegisterRange: ClosedRange<Address> = 0xFF40...0xFF4B
     static let dmaRegister: Address = 0xFF46
     
@@ -57,8 +56,8 @@ private enum MemorySection {
     case lcdRegisters
     case dmaRegister
     case highRAM
-    case interruptEnable
-    case other
+    case interruptController
+    case unknown
 }
 
 protocol MemoryMappedDevice {
@@ -122,34 +121,32 @@ class Memory {
                 return 0xFF     // Open bus, you wouldn't have been able to read anything at that address
             }
 
-            // Route it to the right place
+            // Route it to the right place (order doesn't matter, the classifier took care of that)
             
             switch section {
             case .rom:
                 return cartridge.readFromROM(index)
-            case .videoRAM, .lcdRegisters, .objectAttributeMemory:
+            case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
                 return ppu.readRegister(index)
-            case .externalRAM:
-                return cartridge.readFromRAM(index)
-            case .workRAM:
-                return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
+            case .timerRegisters:
+                return timer.readRegister(index)
             case .ioRegisters:
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .joypad:
                 return joypad.readRegister(index)
-            case .timerRegisters:
-                return timer.readRegister(index)
+            case .externalRAM:
+                return cartridge.readFromRAM(index)
+            case .workRAM:
+                return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
             case .highRAM:
                 return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
-            case .interruptEnable:
+            case .interruptController:
                 return interruptController.readRegister(index)
-            default:
+            case .unknown:
                 return 0xFF // Reading anywhere else gets you an open bus (0xFF)
             }
         }
-        set(value) {
-            // Quick debug test
-            
+        set(value) {            
             if (BLARGG_TEST_ROMS || GAMEBOY_DOCTOR) && index == MemoryLocations.serialControl && value == 0x81 {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.
@@ -170,28 +167,28 @@ class Memory {
                 return  // During DMA you can't write to that address
             }
             
-            // Route it to the right place
+            // Route it to the right place (order doesn't matter, the classifier took care of that)
             
             switch section {
             case .rom:
                 cartridge.writeToROM(index, value)
-            case .videoRAM, .lcdRegisters, .objectAttributeMemory:
+            case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
                 ppu.writeRegister(index, value)
             case .externalRAM:
                 cartridge.writeToRAM(index, value)
             case .workRAM:
                 workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
+            case .timerRegisters:
+                timer.writeRegister(index, value)
             case .ioRegisters:
                 ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
             case .joypad:
                 joypad.writeRegister(index, value)
-            case .timerRegisters:
-                timer.writeRegister(index, value)
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
-            case .interruptEnable:
+            case .interruptController:
                 interruptController.writeRegister(index, value)
-            default:
+            case .unknown:
                 // We'll do nothing
                 return
             }
@@ -201,7 +198,22 @@ class Memory {
     // MARK: - Private helper methods
     
     private func categorizeAddress(_ address: Address) -> MemorySection {
+        // Note that overall ranges (like I/O registers) must come AFTER more specific entries (like joystick or video registers)
+        
         switch address {
+        
+        case MemoryLocations.timerRegistersRange:
+            return .timerRegisters
+        case MemoryLocations.joypad:
+            return .joypad
+        case MemoryLocations.dmaRegister:
+            return .dmaRegister
+        case MemoryLocations.lcdRegisterRange:
+            return .lcdRegisters
+        case MemoryLocations.interruptEnable, MemoryLocations.interruptFlags:
+            return .interruptController
+        case MemoryLocations.ioRegisterRange:
+            return .ioRegisters
         case MemoryLocations.romRange:
             return .rom
         case MemoryLocations.videoRAMRange:
@@ -212,22 +224,10 @@ class Memory {
             return .workRAM
         case MemoryLocations.objectAttributeMemoryRange:
             return .objectAttributeMemory
-        case MemoryLocations.timerRegistersRange:
-            return .timerRegisters
-        case MemoryLocations.ioRegisterRange:
-            return .ioRegisters
-        case MemoryLocations.joypad:
-            return .joypad
-        case MemoryLocations.dmaRegister:
-            return .dmaRegister
-        case MemoryLocations.lcdRegisterRange:
-            return .lcdRegisters
         case MemoryLocations.highRAMRange:
             return .highRAM
-        case MemoryLocations.interruptEnable:
-            return .interruptEnable
         default:
-            return .other
+            return .unknown
         }
     }
 }

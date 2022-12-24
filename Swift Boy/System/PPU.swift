@@ -46,13 +46,13 @@ private enum LCDStatus {
     static let yCompareStatus: UInt8 = 0x04
 }
 
-private enum LCDMode {
+private enum PPUMode {
     static let horizontablBlank: UInt8 = 0x00
     static let verticalBlank: UInt8 = 0x01
     static let searchingOAM: UInt8 = 0x02
     static let drawingToLCD: UInt8 = 0x03
     
-    static let oamBlockedStatus: ClosedRange = LCDMode.searchingOAM...LCDMode.drawingToLCD  // The statuses where OAM is blocked
+    static let oamBlockedStatus: ClosedRange = PPUMode.searchingOAM...PPUMode.drawingToLCD  // The statuses where OAM is blocked
 }
 
 private enum LCDColors {
@@ -142,13 +142,12 @@ class PPU: MemoryMappedDevice {
         lcdYCoordinate = 144                    // The first line of the vertical blank period
         _lcdStatus = 0                          // Nothing special going on (current mode is ORed in on read)
         ticksIntoLine = 0
-        ppuMode = LCDMode.verticalBlank
+        ppuMode = PPUMode.verticalBlank
         
         // The rest we'll just set to 0x00 unless the hardware sets it based on state like the LCD status
         
         viewportY = 0x00
         viewportX = 0x00
-        lcdYCoordinate = 0x00
         lcdYCompare = 0x00
         windowY = 0x00
         windowX = 0x00
@@ -195,47 +194,43 @@ class PPU: MemoryMappedDevice {
                 // Time for a new screen!
                 
                 lcdYCoordinate = 0
-                ppuMode = LCDMode.searchingOAM
+                ppuMode = PPUMode.searchingOAM
                 
                 needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
-            } else if lcdYCoordinate >= 144 && ppuMode != LCDMode.verticalBlank {
+            } else if lcdYCoordinate >= 144 && ppuMode != PPUMode.verticalBlank {
                 // We're doing the vertical blank now, set it up
-                ppuMode = LCDMode.verticalBlank
+                ppuMode = PPUMode.verticalBlank
                 
                 needsInterrupt = (lcdStatus & LCDStatus.vBankInterruptSource) > 0  // Flag interrupt if needed
                 
                 if CONSOLE_DISPLAY {
                     print(String(repeating: "-", count: 160))
                 }
-            } else if ppuMode != LCDMode.verticalBlank {
+            } else if ppuMode != PPUMode.verticalBlank {
                 // Just a normal new line when not in the vertical blank
                 
-                ppuMode = LCDMode.searchingOAM
+                ppuMode = PPUMode.searchingOAM
                 
                 needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
             }
-        } else if ppuMode != LCDMode.verticalBlank {
+        } else if ppuMode != PPUMode.verticalBlank {
             // In vertical blank there is nothing to do during a line, so only act if that's not what's going on
             
-            if ticksIntoLine > 80 && ticksIntoLine <= 252 && ppuMode != LCDMode.drawingToLCD {
+            if ticksIntoLine > 80 && ticksIntoLine <= 252 && ppuMode != PPUMode.drawingToLCD {
                 // Transition to drawing mode. We'll pretend it ALWAYS takes 172 ticks instead of variable like a real GameBoy
                 // As soon as this mode starts we'll draw the line for output by calling drawLine()
                 
-                ppuMode = LCDMode.drawingToLCD
+                ppuMode = PPUMode.drawingToLCD
                 
                 let colorData = drawLine()
                 
                 if CONSOLE_DISPLAY {
-                    let colors = [" ", "░", "▒", "▓"]
-                    
-                    let colorCharacters = colorData.map({colors[Int($0)]}).joined()
-                    
-                    print(colorCharacters)
+                    dumpLine(colorData)
                 }
-            } else if ticksIntoLine > 252 && ppuMode != LCDMode.horizontablBlank {
+            } else if ticksIntoLine > 252 && ppuMode != PPUMode.horizontablBlank {
                 // Transition to Horizontal Blank
                 
-                ppuMode = LCDMode.horizontablBlank
+                ppuMode = PPUMode.horizontablBlank
                 
                 needsInterrupt = (lcdStatus & LCDStatus.hBlankInterruptSource) > 0  // Flag interrupt if needed
             }
@@ -355,7 +350,7 @@ class PPU: MemoryMappedDevice {
             let mapIndex = UInt16(yTile) * 32 + UInt16(x)
             
             // With that index we can get the index into the tile set to get data for
-            
+           
             let tileIndex = videoRAM[Int(baseAddress + mapIndex - MemoryLocations.videoRAMRange.lowerBound)]
             
             // With that index we can get the address for the actual data, figure out the color indexes, and apply the fixed palette
@@ -623,18 +618,47 @@ class PPU: MemoryMappedDevice {
         return colors.reversed()
     }
     
+    // MARK: - Private debugging functions to make life easy
+    
+    private func dumpBackgroundTiles(range: Range<UInt8>) {
+        let colors = [" ", "░", "▒", "▓"]
+        
+        print("--------")
+        
+        for tile: UInt8 in range {
+            print("Tile: \(tile)")
+            
+            for line: UInt8 in 0...7 {
+                let indexes = findColorData(line: line, baseAddress: getBackgroundWindowAddress(tile))
+                let lineColors = applyPalette(backgroundPalette, indexes, transparency: false)
+                let chars = lineColors.map({colors[Int($0!)]}).joined()
+                print(chars)
+            }
+            
+            print("--------")
+        }
+    }
+    
+    private func dumpLine(_ colorData: [FinalColor]) {
+        let colors = [" ", "░", "▒", "▓"]
+        
+        let colorCharacters = colorData.map({colors[Int($0)]}).joined()
+        
+        print(colorCharacters)
+    }
+    
     // MARK: - MemoryMappedDevice protocol functions
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(ppuMode):
+        case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
             // During these times any reads return 0xFF becuase the memory is blocked
             // It would also trigger OAM corruption, which we'll ignore
             return 0xFF
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time it just returns 0x00 no matter what's in the memory
             return 0x00
-        case MemoryLocations.videoRAMRange where ppuMode == LCDMode.drawingToLCD:
+        case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
             // During this time you can't access the video RAM, so we'll return 0xFF
             return 0xFF
         case MemoryLocations.videoRAMRange:
@@ -670,25 +694,28 @@ class PPU: MemoryMappedDevice {
     
     func writeRegister(_ address: Address, _ value: UInt8) {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where LCDMode.oamBlockedStatus.contains(ppuMode):
+        case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
             // During these times the memory is blocked and you can't write
             return
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time writing is OK
             oamRAM[Int(address - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
-        case MemoryLocations.videoRAMRange where ppuMode == LCDMode.drawingToLCD:
+        case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
             // During this time you can't access the video RAM, so you can't write
+
             return
         case MemoryLocations.videoRAMRange:
             // You're allowed to access video RAM during this time, so have at it
             videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)] = value
+
+            return
         case LCD_CONTROL:
             // When the LCD is disabled we'll set our internal state so it's sane on restart
             
             if value & LCDControl.lcdEnable == 0 && lcdControl & LCDControl.lcdEnable > 0 {
                 lcdYCoordinate = 144                    // The first line of the vertical blank period
                 ticksIntoLine = 0                       // We'll restart at the start of the line
-                ppuMode = LCDMode.verticalBlank     // We'll be in the vertical blank
+                ppuMode = PPUMode.verticalBlank         // We'll be in the vertical blank
             }
             
             return lcdControl = value
