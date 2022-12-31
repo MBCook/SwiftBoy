@@ -27,6 +27,14 @@ private let OAM_X_POSITION: UInt8 = 1
 private let OAM_TILE_INDEX: UInt8 = 2
 private let OAM_ATTRIBUTES: UInt8 = 3
 
+private let TICKS_PER_LINE: UInt8 = 114     // 456 dots / 4 dots per tick
+private let TICKS_PER_SCAN: UInt8 = 20      // 80 dots / 4 dots per tick
+private let TICKS_PER_DRAW: UInt8 = 43      // 172 dots / 4 dots per tick
+private let TICKS_PER_HBLANK: UInt8 = 51    // 204 dots / 4 dots per tick
+
+private let VBLANK_START: UInt8 = 144
+private let LAST_LINE: UInt8 = 153
+
 private enum LCDControl {
     static let lcdEnable: UInt8 = 0x80
     static let windowTilemapArea: UInt8 = 0x40
@@ -85,7 +93,7 @@ class PPU: MemoryMappedDevice {
     private var oamRAM: Data!                   // RAM that controls sprite/timemap display
     
     private var ppuMode: Register = 0           // Current PPU mode
-    private var ticksIntoLine: UInt16 = 0
+    private var ticksIntoLine: UInt8 = 0
     
     private var dmaController: DMAController    // The DMA controller only exists to help the PPU by moving data fast
     
@@ -139,8 +147,8 @@ class PPU: MemoryMappedDevice {
         
         // And set a sane statuses
         
-        lcdYCoordinate = 144                    // The first line of the vertical blank period
-        _lcdStatus = 0                          // Nothing special going on (current mode is ORed in on read)
+        lcdYCoordinate = 0                      // The first line
+        _lcdStatus = 0x85                       // Default status from bootup
         ticksIntoLine = 0
         ppuMode = PPUMode.verticalBlank
         
@@ -175,29 +183,30 @@ class PPU: MemoryMappedDevice {
         
         dmaController.tick(ticks)
         
-        // Now update our modes and do drawing work if necessary
+        // Now update our modes and do drawing work if necessary.
+        // NOTE: We track things in ticks (~1 MHz) not dots (~4 MHz), so make sure to use the right units!
         
-        ticksIntoLine += UInt16(ticks)
+        ticksIntoLine += ticks
         
         var needsInterrupt = false
         
         // We only act if something needs to change (end of mode or line)
         
-        if ticksIntoLine > 456 {
+        if ticksIntoLine > TICKS_PER_LINE {
             // Line is over, go to next line
             
-            ticksIntoLine %= 456
+            ticksIntoLine %= TICKS_PER_LINE
             
             lcdYCoordinate += 1
             
-            if lcdYCoordinate > 153 {
+            if lcdYCoordinate > LAST_LINE {
                 // Time for a new screen!
                 
                 lcdYCoordinate = 0
                 ppuMode = PPUMode.searchingOAM
                 
                 needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
-            } else if lcdYCoordinate >= 144 && ppuMode != PPUMode.verticalBlank {
+            } else if lcdYCoordinate >= VBLANK_START && ppuMode != PPUMode.verticalBlank {
                 // We're doing the vertical blank now, set it up
                 ppuMode = PPUMode.verticalBlank
                 
@@ -216,7 +225,7 @@ class PPU: MemoryMappedDevice {
         } else if ppuMode != PPUMode.verticalBlank {
             // In vertical blank there is nothing to do during a line, so only act if that's not what's going on
             
-            if ticksIntoLine > 80 && ticksIntoLine <= 252 && ppuMode != PPUMode.drawingToLCD {
+            if ticksIntoLine > TICKS_PER_SCAN && ticksIntoLine <= TICKS_PER_SCAN + TICKS_PER_DRAW && ppuMode != PPUMode.drawingToLCD {
                 // Transition to drawing mode. We'll pretend it ALWAYS takes 172 ticks instead of variable like a real GameBoy
                 // As soon as this mode starts we'll draw the line for output by calling drawLine()
                 
@@ -227,7 +236,7 @@ class PPU: MemoryMappedDevice {
                 if CONSOLE_DISPLAY {
                     dumpLine(colorData)
                 }
-            } else if ticksIntoLine > 252 && ppuMode != PPUMode.horizontablBlank {
+            } else if ticksIntoLine > TICKS_PER_SCAN + TICKS_PER_DRAW && ppuMode != PPUMode.horizontablBlank {
                 // Transition to Horizontal Blank
                 
                 ppuMode = PPUMode.horizontablBlank

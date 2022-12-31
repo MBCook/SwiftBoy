@@ -395,7 +395,7 @@ class CPU {
             
             push(pc + 3)    // The +3 is for the bytes of this instruction
             
-            return (readWord(pc + 1), 5)
+            return (readWord(pc + 1), 6)
         } else {
             // The flag was the wrong value, keep going without a return
             

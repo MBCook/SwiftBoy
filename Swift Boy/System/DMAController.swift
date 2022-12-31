@@ -24,9 +24,9 @@ class DMAController: MemoryMappedDevice {
     }
     
     func reset() {
-        // Put things back to a sane default
+        // Gameboys start with the register holding 0xFF
         
-        lastSource = 0x00
+        lastSource = 0xFF
         ticksLeft = 0
     }
     

@@ -19,10 +19,10 @@ class Timer: MemoryMappedDevice {
     
     // MARK: - Our private data
     
-    private var lastDivRegisterIncrement: UInt8 = 0         // The last time the DIV register was incremented
+    private var lastDivRegisterIncrement: UInt16 = 0        // The last time the DIV register was incremented
     private var lastTimerRegisterIncrement: UInt16 = 0      // The last time the counter was incremented
     
-    private let TICKS_PER_DIV = 64
+    private let TICKS_PER_DIV: UInt16 = 256
     private let CLOCK_DIVISOR_MASK: UInt8 = 0x03
     
     private let DIV_REGISTER: Address = 0xFF04
@@ -46,27 +46,27 @@ class Timer: MemoryMappedDevice {
     }
     
     func reset() {
-        // Just initialize everything to 0x00, that's what the hardware does
+        // Do what a real gameboy does. DIV starts at 0xAB, TAC starts at 0xF8
         
         lastDivRegisterIncrement = 0
         lastTimerRegisterIncrement = 0
-        divRegister = 0
+        divRegister = 0xAB
         timerCounter = 0
         timerModulo = 0
-        timerControl = 0
+        timerControl = 0xF8
     }    
     
     func tick(_ ticks: Ticks) -> InterruptSource? {
         // Handle each part of the clock independently. First the div register, which is always counting up.
         
-        lastDivRegisterIncrement = lastDivRegisterIncrement + ticks
+        lastDivRegisterIncrement = lastDivRegisterIncrement + UInt16(ticks)
         
         if lastDivRegisterIncrement >= TICKS_PER_DIV {
             // We need to increment the div register
             
             divRegister &+= 1       // Register needs to be able to wrap around
             
-            lastDivRegisterIncrement %= 64      // Don't forget any extra if the last instruction took too long
+            lastDivRegisterIncrement -= TICKS_PER_DIV   // Don't forget any extra if the last instruction took too long
         }
         
         // Do we need to update the timer? Only if the time enable bit is on
@@ -77,19 +77,19 @@ class Timer: MemoryMappedDevice {
             return nil
         }
         
-        // Get our divisor
+        // Get our divisor. "Clock" refers to CPU clock (~4 MHz), not ticks (~ 1MHz). So we divide by an extra 4 since we count in ticks.
         
         let divisor: UInt16
         
         switch timerControl & CLOCK_DIVISOR_MASK {
         case TimerControlBits.clockDivIs1024:
-            divisor = 1024
-        case TimerControlBits.clockDivIs16:
-            divisor = 16
-        case TimerControlBits.clockDivIs64:
-            divisor = 64
-        case TimerControlBits.clockDivIs256:
             divisor = 256
+        case TimerControlBits.clockDivIs16:
+            divisor = 4
+        case TimerControlBits.clockDivIs64:
+            divisor = 16
+        case TimerControlBits.clockDivIs256:
+            divisor = 64
         default:
             // Xcode can't seem to figure out we have all possible cases of 2 bits
             fatalError("Unable to find a case for time control value 0x\(toHex(timerControl))!")
@@ -99,22 +99,31 @@ class Timer: MemoryMappedDevice {
         
         lastTimerRegisterIncrement = lastTimerRegisterIncrement + UInt16(ticks)
         
-        if lastTimerRegisterIncrement > divisor {
+        var interruptNeeded = false
+        
+        while lastTimerRegisterIncrement >= divisor {
+            // A timer register increment has occured. Adjust our counter.
+            
+            lastTimerRegisterIncrement -= divisor   // We can't get over divisor
+            
             // Time to increment the timer, be prepared for an overflow
             
             if timerCounter == 0xFF {       // Time to reset
                 // We need to raise an interrput (0xFF + 1 would have rolled over)
                 
-                timerCounter = timerModulo      // Resert the timer to the modulo value
-                lastTimerRegisterIncrement = 0  // Start the counting intervals from 0 again
-                
-                return InterruptSource.timer
+                timerCounter = timerModulo              // Resert the timer to the modulo value
+            
+                interruptNeeded = true
             } else {
+                // Not time for the interrupt yet, so just increase the timer counter
+                
                 timerCounter += 1
             }
         }
         
-        return nil
+        // Raise the interrupt if we overflowed
+        
+        return interruptNeeded ? InterruptSource.timer : nil
     }
     
     // MARK: - MemoryMappedDevice protocol functions
@@ -144,6 +153,12 @@ class Timer: MemoryMappedDevice {
         case TIME_MODULO_REGISTER:
             timerModulo = value
         case TIMER_CONTROL_REGISTER:
+            if timerControl & CLOCK_DIVISOR_MASK != value & CLOCK_DIVISOR_MASK {
+                // They changed the timer rate, reset the internal counter and timer counter
+
+                lastTimerRegisterIncrement = 0
+                timerCounter = timerModulo
+            }
             timerControl = value
         default:
             fatalError("The timer should not have been asked to set memory address 0x\(toHex(address))")
