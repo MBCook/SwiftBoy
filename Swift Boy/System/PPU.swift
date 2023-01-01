@@ -288,12 +288,14 @@ class PPU: MemoryMappedDevice, ObservableObject {
         }
         
         // Always update then check the Y coordinate compare register
+        // NOTE: We must use _lcdStatus because lcdStatus would mask out our updates to these bits
         
-        let yMatches = lcdYCompare == lcdYCoordinate
-        
-        lcdStatus = lcdStatus & (0xFF - LCDStatus.yCompareStatus) | (yMatches ? LCDStatus.yCompareStatus : 0x00)
-        
-        needsInterrupt = needsInterrupt || (lcdStatus & LCDStatus.yCompareStatus) > 0   // Flag interrupt if needed
+        if lcdYCompare == lcdYCoordinate {
+            _lcdStatus = _lcdStatus | LCDStatus.yCompareStatus                                      // Turn on yCompare
+            needsInterrupt = needsInterrupt || (_lcdStatus & LCDStatus.yCompareInterruptSource > 0) // Trigger interrupt if requested
+        } else {
+            _lcdStatus = _lcdStatus & (0xFF - LCDStatus.yCompareStatus)     // Turn off yCompare
+        }
         
         // Return an interrupt if needed
         
