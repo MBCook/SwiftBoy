@@ -18,42 +18,32 @@ private enum BankingMode {
 }
 
 class MBC1: Cartridge {
-    // MARK: Our private data
+    // MARK: - Our private data
     
     private var rom: Data           // The actual ROM data
     private var romBank: UInt8      // Which ROM bank is currently selected
     private var romMask: UInt32     // The mask to mask ROM addresses with (based on total size)
-    private var _totalROM: UInt32
     
     private var ramEnabled: Bool    // Is RAM turned on?
     private var ram: Data?          // If we have RAM, it's here
     private var ramBank: UInt8      // Which RAM bank is currently selected
     private var ramMask: UInt16     // The mask to mask RAM addresses with (based on total size)
-    private var _totalRAM: UInt32
     
     private var addressMode: AddressMode    // Should the RAM bank be used as upper address bits for ROM
     private var bankingMode: BankingMode    // Can they remap bank 0?
     
-    // MARK: - Public properties
+    // MARK: - Out public properties (setters are private)
     
-    var totalROM: UInt32 {
-        get {
-            return _totalROM
-        }
-    }
-    var totalRAM: UInt32 {
-        get {
-            return _totalRAM
-        }
-    }
+    private(set) var totalROM: UInt32
+    private(set) var totalRAM: UInt32
     
     // MARK: - Cartridge methods
     
     required init(romSize: UInt32, ramSize: UInt32, romData: Data) {
         // Record our ROM/RAM sizes and data
         
-        _totalROM = romSize
-        _totalRAM = ramSize
+        totalROM = romSize
+        totalRAM = ramSize
         rom = romData
         
         romMask = romSize - 1
@@ -107,7 +97,7 @@ class MBC1: Cartridge {
         case 0x0000...0x1FFF:
             // Controls if RAM is enabled or not (we'll ignore it if there is no RAM)
             
-            if _totalRAM > 0 {
+            if totalRAM > 0 {
                 ramEnabled = value & 0x0F == 0x0A   // Lower nibble has to be A for some reason in the GB hardware
             }
         case 0x2000...0x3FFF:

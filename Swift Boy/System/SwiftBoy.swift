@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import SwiftUI
+import Combine
 
 typealias Address = UInt16
 typealias Bitmask = UInt8
@@ -15,10 +17,10 @@ typealias RegisterPair = UInt16
 typealias Ticks = UInt8
 
 let GAMEBOY_DOCTOR = false
-let BLARGG_TEST_ROMS = true
+let BLARGG_TEST_ROMS = false
 let CONSOLE_DISPLAY = false
 
-class SwiftBoy {
+class SwiftBoy: ObservableObject {
     // MARK: - Our private variables
     
     private var cpu: CPU
@@ -28,9 +30,15 @@ class SwiftBoy {
     private var ppu: PPU
     private var joypad: Joypad
     
+    private var paused: Bool
     private var logFile: FileHandle?
     
-    private var paused: Bool
+    private var screenCancellable: AnyCancellable!
+    
+    // MARK: - Our published variables
+    
+    @Published
+    var screen: Image!
     
     // MARK: - Our public interface
     
@@ -42,7 +50,7 @@ class SwiftBoy {
         interruptController = InterruptController()
         
         let dmaController = DMAController()
-        
+
         ppu = PPU(dmaController: dmaController)
         memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu, joypad: joypad)
         
@@ -51,6 +59,16 @@ class SwiftBoy {
         cpu = CPU(memory: memory, interruptController: interruptController)
         
         paused = false
+        
+        screen = renderFrame(nil)
+        
+        screenCancellable = ppu.$currentFrame.sink { [self] data in
+            let frame = renderFrame(data)
+            
+            DispatchQueue.main.async {
+                self.screen = frame
+            }
+        }
     }
     
     func pause() {
@@ -58,7 +76,7 @@ class SwiftBoy {
     }
     
     func reset() {
-        // Just call reset on all the objects
+        // Just call reset on all the objects and render a blank screen
         
         timer.reset()
         joypad.reset()
@@ -66,10 +84,12 @@ class SwiftBoy {
         ppu.reset()
         memory.reset()
         cpu.reset()
+        
+        screen = renderFrame(nil)
     }
     
     func loadGameAndReset(_ cartridge: Cartridge) {
-        // Just call reset on all the objects except memory, which gets the new cartridge
+        // Just call reset on all the objects except memory, which gets the new cartridge, then render a blank screen
         
         timer.reset()
         joypad.reset()
@@ -77,6 +97,8 @@ class SwiftBoy {
         ppu.reset()
         memory.loadGameAndReset(cartridge)
         cpu.reset()
+        
+        screen = renderFrame(nil)
     }
     
     // The main runloop
@@ -166,6 +188,39 @@ class SwiftBoy {
                     fatalError(error.localizedDescription)
                 } else {
                     fatalError("An unknown error occurred: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    // MARK: - Private methods
+    
+    private func renderFrame(_ data: Data?) -> Image {
+        guard data != nil else {
+            return Image("Blank")
+        }
+        
+        // Ok, we've got stuff to render to an image
+        
+        return Image(size: CGSize(width: PIXELS_WIDE, height: PIXELS_TALL), opaque: true, colorMode: .nonLinear) { gc in
+            // Palette is called TU GBP Clean from https://github.com/trashuncle/Gameboy_Palettes
+            
+            let palette = [
+                CGColor(red: 0xF0 / 256.0, green: 0xFE / 256.0, blue: 0xF8 / 256.0, alpha: 1.0),    // White
+                CGColor(red: 0xB0 / 256.0, green: 0xC2 / 256.0, blue: 0xAD / 256.0, alpha: 1.0),    // Light
+                CGColor(red: 0x9B / 256.0, green: 0xA4 / 256.0, blue: 0x95 / 256.0, alpha: 1.0),    // Dark
+                CGColor(red: 0x37 / 256.0, green: 0x41 / 256.0, blue: 0x35 / 256.0, alpha: 1.0)     // Black
+            ]
+            
+            // Do the drawing
+            
+            gc.withCGContext { context in
+                for y in 0..<PIXELS_TALL {
+                    for x in 0..<PIXELS_WIDE {
+                        let start = y * PIXELS_WIDE
+                        context.setFillColor(palette[Int(data![start + x])])
+                        context.fill(CGRect(x: x, y: y, width: 1, height: 1))
+                    }
                 }
             }
         }

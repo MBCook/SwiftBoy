@@ -146,7 +146,7 @@ class Memory {
                 return 0xFF // Reading anywhere else gets you an open bus (0xFF)
             }
         }
-        set(value) {            
+        set(value) {
             if (BLARGG_TEST_ROMS || GAMEBOY_DOCTOR) && index == MemoryLocations.serialControl && value == 0x81 {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.

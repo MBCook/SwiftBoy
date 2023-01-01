@@ -17,7 +17,7 @@
 		4C318A8A29467265006F9377 /* MBC1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8929467265006F9377 /* MBC1.swift */; };
 		4C318A8C2946B272006F9377 /* PPU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8B2946B272006F9377 /* PPU.swift */; };
 		4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */; };
-		4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B942293C263800D4EEA0 /* ContentView.swift */; };
+		4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B942293C263800D4EEA0 /* SwiftBoyView.swift */; };
 		4C35B945293C263900D4EEA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B944293C263900D4EEA0 /* Assets.xcassets */; };
 		4C35B948293C263900D4EEA0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B947293C263900D4EEA0 /* Preview Assets.xcassets */; };
 		4C35B952293C291600D4EEA0 /* CPU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B951293C291600D4EEA0 /* CPU.swift */; };
@@ -39,7 +39,7 @@
 		4C318A8B2946B272006F9377 /* PPU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPU.swift; sourceTree = "<group>"; };
 		4C35B93D293C263800D4EEA0 /* Swift Boy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Swift Boy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swift_BoyApp.swift; sourceTree = "<group>"; };
-		4C35B942293C263800D4EEA0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		4C35B942293C263800D4EEA0 /* SwiftBoyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftBoyView.swift; sourceTree = "<group>"; };
 		4C35B944293C263900D4EEA0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4C35B947293C263900D4EEA0 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		4C35B949293C263900D4EEA0 /* Swift_Boy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Swift_Boy.entitlements; sourceTree = "<group>"; };
@@ -98,7 +98,7 @@
 				4C4A820E295144CA00D0ECBE /* Swift-Boy-Info.plist */,
 				4C35B950293C290900D4EEA0 /* System */,
 				4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */,
-				4C35B942293C263800D4EEA0 /* ContentView.swift */,
+				4C35B942293C263800D4EEA0 /* SwiftBoyView.swift */,
 				4C35B944293C263900D4EEA0 /* Assets.xcassets */,
 				4C35B949293C263900D4EEA0 /* Swift_Boy.entitlements */,
 				4C35B946293C263900D4EEA0 /* Preview Content */,
@@ -218,7 +218,7 @@
 				4C13DD4F29416BD800C8786C /* Utility.swift in Sources */,
 				4C318A8529455B84006F9377 /* Cartridge.swift in Sources */,
 				4C92EA14294D52F800412D30 /* DMAController.swift in Sources */,
-				4C35B943293C263800D4EEA0 /* ContentView.swift in Sources */,
+				4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4C318A8A29467265006F9377 /* MBC1.swift in Sources */,
 				4C318A8C2946B272006F9377 /* PPU.swift in Sources */,

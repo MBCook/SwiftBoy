@@ -20,7 +20,7 @@ private let SPRITE_PALETTE_ONE: Address = 0xFF49
 private let WINDOW_Y: Address = 0xFF4A
 private let WINDOW_X: Address = 0xFF4B
 
-private let OAM_ENTRIES: UInt8 = 4
+private let OAM_ENTRIES: UInt8 = 40
 private let BYTES_PER_OAM = 4
 private let OAM_Y_POSITION: UInt8 = 0
 private let OAM_X_POSITION: UInt8 = 1
@@ -34,8 +34,8 @@ private let TICKS_PER_HBLANK: UInt8 = 51    // 204 dots / 4 dots per tick
 
 private let VBLANK_START: UInt8 = 144
 private let LAST_LINE: UInt8 = 153
-private let PIXELS_WIDE = 160
-private let PIXELS_TALL = 144
+let PIXELS_WIDE = 160
+let PIXELS_TALL = 144
 
 private enum LCDControl {
     static let lcdEnable: UInt8 = 0x80
@@ -93,14 +93,13 @@ private typealias ColumnNumber = UInt8
 private typealias LineNumber = UInt8
 private typealias PixelCoordinate = Int16       // We have to deal with negative numbers and numbers over 127, so UInt8 and Int8 won't work
 
-class PPU: MemoryMappedDevice {
+class PPU: MemoryMappedDevice, ObservableObject {
     
     // MARK: - Our private data
     
     private var videoRAM: Data!                 // Built in RAM to hold sprites and tiles
     private var oamRAM: Data!                   // RAM that controls sprite/timemap display
     
-    private var currentFrame: Data!             // The most recently completed frame
     private var nextFrame: Data!                // The next frame in progress
     
     private var frameAvailable = false          // If a frame has been generated since last check by external source
@@ -135,6 +134,11 @@ class PPU: MemoryMappedDevice {
     private var windowY: Register = 0
     private var windowX: Register = 0
     
+    // MARK: - Public properties
+    
+    @Published
+    private(set) var currentFrame: Data!        // The most recently completed frame
+    
     // MARK: - Public interface
     
     init(dmaController: DMAController) {
@@ -166,7 +170,7 @@ class PPU: MemoryMappedDevice {
         // And set a sane statuses
         
         lcdYCoordinate = 0                      // The first line
-        _lcdStatus = 0x85                       // Default status from bootup
+        lcdStatus = 0x85                       // Default status from bootup
         ticksIntoLine = 0
         ppuMode = PPUMode.verticalBlank
         frameAvailable = false
@@ -550,7 +554,7 @@ class PPU: MemoryMappedDevice {
     
     private func findTenSpritesOnLine() -> [(OAMOffset, LineNumber)] {
         // Find the first 10 sprites on the current line, returning (OAM offset, sprite line) so we can draw them
-        
+
         guard lcdControl & LCDControl.objectEnable > 0 else {
             // If sprites are turned off, why are we doing anythikng?
             
@@ -613,7 +617,8 @@ class PPU: MemoryMappedDevice {
     }
     
     private func findSpriteYCoordinate(_ sprite: OAMOffset, lcdY: LineNumber) -> LineNumber? {
-        let spriteHeight: Int16 = ((lcdControl & LCDControl.objectSize) > 0) ? 8 : 16
+        
+        let spriteHeight: Int16 = ((lcdControl & LCDControl.objectSize) > 0) ? 16 : 8
         let spriteYStart = Int16(oamRAM[Int(sprite + OAM_Y_POSITION)]) - 16
         
         if lcdY < spriteYStart {
@@ -758,6 +763,7 @@ class PPU: MemoryMappedDevice {
             return
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time writing is OK
+         
             oamRAM[Int(address - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
         case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
             // During this time you can't access the video RAM, so you can't write

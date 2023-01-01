@@ -15,16 +15,8 @@ class NoMapper: Cartridge {
     
     // MARK: - Public properties
     
-    var totalROM: UInt32 {
-        get {
-            return THIRTY_TWO_KB // We only support 32 KB of ROM
-        }
-    }
-    var totalRAM: UInt32 {
-        get {
-            return UInt32(ram?.count ?? 0)
-        }
-    }
+    let totalROM: UInt32 = THIRTY_TWO_KB    // We only support 32 KB of ROM
+    private(set) var totalRAM: UInt32
     
     // MARK: - Cartridge methods
     
@@ -37,6 +29,7 @@ class NoMapper: Cartridge {
         }
         
         rom = romData
+        totalRAM = ramSize
     }
     
     static func sanityCheckSizes(romSize: UInt32, ramSize: UInt32) -> (Bool, Bool) {

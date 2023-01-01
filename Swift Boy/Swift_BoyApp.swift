@@ -9,14 +9,26 @@ import SwiftUI
 
 @main
 struct Swift_BoyApp: App {
-    // TODO: This gets ignored if there is a main function, so we'll need to remove Main when we're ready to go GUI
+    // MARK: - Our scene for our app
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SwiftBoyView()
+                .environmentObject(swiftBoy)
+                .onDisappear {
+                    NSApplication.shared.terminate(self)
+                }
         }
     }
     
-    static func main() {
+    // MARK: - Private variables we need to keep track of
+    
+    private var swiftBoy: SwiftBoy
+    private var backgroundTask: Task<(), Never>!
+    
+    // MARK: - Public methods
+    
+    init() {
         // The file we want to load
    
 //-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/halt_bug.gb")
@@ -24,14 +36,22 @@ struct Swift_BoyApp: App {
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
 //CGB        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/interrupt_time/interrupt_time.gb")
         
-        // Create memory with that rom
-        
         do {
+            // Create stuff
+            
             let rom = try Data(contentsOf: romURL)
             let cartridge = try CartridgeHelper.loadROM(rom)
-            let swiftBoy = try SwiftBoy(cartridge: cartridge)
+            let boy = try SwiftBoy(cartridge: cartridge)
 
-            swiftBoy.run()
+            // Save a reference
+            
+            swiftBoy = boy
+            
+            // Start things running
+            
+            backgroundTask = Task.detached(priority: .userInitiated) {
+                boy.run()
+            }
         } catch {
             fatalError(error.localizedDescription)
         }
