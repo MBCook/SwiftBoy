@@ -606,7 +606,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
             return nil
         }
         
-        guard windowY >= lcdYCoordinate else {
+        guard lcdYCoordinate >= windowY else {
             // We haven't gotten low enough for the window to show yet
             return nil
         }

@@ -76,11 +76,11 @@ class DMAController: MemoryMappedDevice {
         
         // Copy all the data right now
         
-        for lowerAddressByte: UInt16 in 0x00...0x9F {
-            let destination = lowerAddressByte + MemoryLocations.objectAttributeMemoryRange.lowerBound
-            let source = lowerAddressByte + UInt16(value << 8)
-            
-            memory![destination] = memory![source]
+        let destination = MemoryLocations.objectAttributeMemoryRange.lowerBound
+        let source = UInt16(value) << 8
+        
+        for index: UInt16 in 0x00...0x9F {
+            memory![destination + index] = memory![source + index]
         }
         
         // Mark how much time is left.
