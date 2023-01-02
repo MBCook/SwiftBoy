@@ -523,7 +523,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
         let vFlip = oamFlags & OAMAttributes.yFlip > 0
         let hFlip = oamFlags & OAMAttributes.xFlip > 0
         
-        let realLine = vFlip ? height - line : line
+        let realLine = vFlip ? height - line - 1 : line
         
         // From there we can get the color indexes
         
