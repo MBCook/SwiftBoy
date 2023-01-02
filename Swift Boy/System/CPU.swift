@@ -191,6 +191,12 @@ class CPU {
             op = memory[pc]
         }
         
+//        if op != 0xCB {
+//            print("\(toHex(pc)): \(toHex(op))")
+//        } else {
+//            print("\(toHex(pc)): \(toHex(op)) \(toHex(memory[pc + 1]))")
+//        }
+//
         // Run the operation, updating the program counter and the number of ticks that were used
             
         let lastPC = pc

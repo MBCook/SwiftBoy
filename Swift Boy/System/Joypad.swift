@@ -40,7 +40,7 @@ class Joypad: MemoryMappedDevice {
     // MARK: - Public interface
     
     init() {
-        // Tell the OS to start watching for game controllers
+        // Tell the OS we want to use controllers
         
         GCController.startWirelessControllerDiscovery()
         
@@ -82,14 +82,18 @@ class Joypad: MemoryMappedDevice {
     // MARK: - Private functions
     
     private func readJoystick() {
-        if let controller = GCController.current?.extendedGamepad {
+        let currentController = GCController.current?.extendedGamepad
+        let firstController = GCController.controllers().count > 0 ? GCController.controllers()[0].extendedGamepad : nil
+        
+        if let controller = currentController ?? firstController {
             // The right kind of controller is connected. Update the states of the buttons they asked for
-            
+                        
             if directionSelected {
                 updateButton(&upButton, to: controller.dpad.up.isPressed)
                 updateButton(&downButton, to: controller.dpad.down.isPressed)
                 updateButton(&leftButton, to: controller.dpad.left.isPressed)
                 updateButton(&rightButton, to: controller.dpad.right.isPressed)
+                
             } else if actionSelected {
                 updateButton(&selectButton, to: controller.buttonOptions?.isPressed ?? false)   // If there is no options button, uh oh
                 updateButton(&startButton, to: controller.buttonMenu.isPressed)
@@ -145,7 +149,7 @@ class Joypad: MemoryMappedDevice {
                result |= rightButton ? JoypadBits.rightA : 0
            }
             
-            return result ^ 0xFF    // To flip all the bits from how we work (active high) to how ROMs expect it (active low)
+           return result ^ 0xFF    // To flip all the bits from how we work (active high) to how ROMs expect it (active low)
         default:
             fatalError("The joypad should not have been asked for memory address 0x\(toHex(address))")
         }

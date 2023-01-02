@@ -153,12 +153,12 @@ class SwiftBoy: ObservableObject {
             
             // Update the LCD controller status (it will update DMA controller for us)
             
-            let lcdInterrupt = ppu.tick(ticksUsed)
+            let lcdInterrupts = ppu.tick(ticksUsed)
             
             // If the LCD controller wants an interrupt, trigger it
             
-            if let lcdInterrupt {
-                interruptController.raiseInterrupt(lcdInterrupt)
+            if let lcdInterrupts {
+                lcdInterrupts.forEach { interruptController.raiseInterrupt($0) }
             }
             
             // Print some debug stuff if in Gameboy Doctor mode

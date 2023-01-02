@@ -8,11 +8,11 @@
 import Foundation
 
 enum InterruptSource: Bitmask, CaseIterable {
-case vblank = 0x01
-case lcdStat = 0x02
-case timer = 0x04
-case serial = 0x08
-case joypad = 0x10
+    case vblank = 0x01
+    case lcdStat = 0x02
+    case timer = 0x04
+    case serial = 0x08
+    case joypad = 0x10
 }
 
 class InterruptController: MemoryMappedDevice {

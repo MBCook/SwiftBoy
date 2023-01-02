@@ -20,8 +20,9 @@ private let SPRITE_PALETTE_ONE: Address = 0xFF49
 private let WINDOW_Y: Address = 0xFF4A
 private let WINDOW_X: Address = 0xFF4B
 
+private let BYTES_PER_TILE = 16
 private let OAM_ENTRIES: UInt8 = 40
-private let BYTES_PER_OAM = 4
+private let BYTES_PER_OAM: UInt8 = 4
 private let OAM_Y_POSITION: UInt8 = 0
 private let OAM_X_POSITION: UInt8 = 1
 private let OAM_TILE_INDEX: UInt8 = 2
@@ -195,7 +196,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
         return dmaController.dmaInProgress()
     }
     
-    func tick(_ ticks: Ticks) -> InterruptSource? {
+    func tick(_ ticks: Ticks) -> [InterruptSource]? {
         // If the LCD is off, we don't draw or do anything.
         
         guard lcdControl & LCDControl.lcdEnable > 0 else {
@@ -211,7 +212,8 @@ class PPU: MemoryMappedDevice, ObservableObject {
         
         ticksIntoLine += ticks
         
-        var needsInterrupt = false
+        var needsStatInterrupt = false
+        var needsVBlankInterrupt = false
         
         // We only act if something needs to change (end of mode or line)
         
@@ -228,7 +230,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
                 lcdYCoordinate = 0
                 ppuMode = PPUMode.searchingOAM
                 
-                needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
+                needsStatInterrupt = lcdStatus & LCDStatus.oamInterruptSource > 0       // Flag stat interrupt if enabled
             } else if lcdYCoordinate >= VBLANK_START && ppuMode != PPUMode.verticalBlank {
                 // We're doing the vertical blank now, set it up
                 ppuMode = PPUMode.verticalBlank
@@ -254,13 +256,14 @@ class PPU: MemoryMappedDevice, ObservableObject {
                 // And record that new frame is ready
                 frameAvailable = true
                 
-                needsInterrupt = (lcdStatus & LCDStatus.vBankInterruptSource) > 0  // Flag interrupt if needed
+                needsStatInterrupt = lcdStatus & LCDStatus.vBankInterruptSource > 0     // Flag stat interrupt if enabled
+                needsVBlankInterrupt = true                                             // Always flag the vblank
             } else if ppuMode != PPUMode.verticalBlank {
                 // Just a normal new line when not in the vertical blank
                 
                 ppuMode = PPUMode.searchingOAM
                 
-                needsInterrupt = (lcdStatus & LCDStatus.oamInterruptSource) > 0    // Flag interrupt if needed
+                needsStatInterrupt = lcdStatus & LCDStatus.oamInterruptSource > 0       // Flag stat interrupt if enabled
             }
         } else if ppuMode != PPUMode.verticalBlank {
             // In vertical blank there is nothing to do during a line, so only act if that's not what's going on
@@ -283,7 +286,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
                 
                 ppuMode = PPUMode.horizontablBlank
                 
-                needsInterrupt = (lcdStatus & LCDStatus.hBlankInterruptSource) > 0  // Flag interrupt if needed
+                needsStatInterrupt = lcdStatus & LCDStatus.hBlankInterruptSource > 0    // Flag stat interrupt if enabled
             }
         }
         
@@ -291,15 +294,26 @@ class PPU: MemoryMappedDevice, ObservableObject {
         // NOTE: We must use _lcdStatus because lcdStatus would mask out our updates to these bits
         
         if lcdYCompare == lcdYCoordinate {
+            let lcdCompareInterruptEnabled = _lcdStatus & LCDStatus.yCompareInterruptSource > 0
+            
             _lcdStatus = _lcdStatus | LCDStatus.yCompareStatus                                      // Turn on yCompare
-            needsInterrupt = needsInterrupt || (_lcdStatus & LCDStatus.yCompareInterruptSource > 0) // Trigger interrupt if requested
+            
+            needsStatInterrupt = needsStatInterrupt || lcdCompareInterruptEnabled   // Trigger stat interrupt if enabled
         } else {
-            _lcdStatus = _lcdStatus & (0xFF - LCDStatus.yCompareStatus)     // Turn off yCompare
+            _lcdStatus = _lcdStatus & (0xFF - LCDStatus.yCompareStatus)             // Turn off yCompare
         }
         
-        // Return an interrupt if needed
+        // Return interrupt(s) needed
         
-        return needsInterrupt ? .lcdStat : nil
+        if needsStatInterrupt && needsVBlankInterrupt {
+            return [.lcdStat, .vblank]
+        } else if needsStatInterrupt {
+            return [.lcdStat]
+        } else if needsVBlankInterrupt {
+            return [.vblank]
+        } else {
+            return nil
+        }
     }
     
     func framebuffer() -> Data {
@@ -523,11 +537,8 @@ class PPU: MemoryMappedDevice, ObservableObject {
         // Now we can figure out the palette and apply it
         
         let palette = oamFlags & OAMAttributes.paletteNumber > 0 ? spritePaletteOne : spritePaletteZero
-        let colors = applyPalette(palette, colorIndexes, transparency: true)
         
-        // Do we need to flip horizontally?
-        
-        return oamFlags & OAMAttributes.xFlip > 0 ? colors.reversed() : colors
+        return applyPalette(palette, colorIndexes, transparency: true)
     }
     
     private func findSpriteLineAtAddress(_ baseAddress: Address, line: LineNumber) -> [ColorIndex] {
@@ -567,12 +578,12 @@ class PPU: MemoryMappedDevice, ObservableObject {
         
         var sprites: [(OAMOffset, LineNumber)] = []
         
-        for offset in stride(from: 0, to: OAM_ENTRIES, by: BYTES_PER_OAM)  {
-            let spriteY = findSpriteYCoordinate(offset, lcdY: lcdYCoordinate)
+        for offset in 0..<OAM_ENTRIES {
+            let spriteY = findSpriteYCoordinate(offset * BYTES_PER_OAM, lcdY: lcdYCoordinate)
             
             if let spriteY {
                 // This line of the sprite needs displaying (unless it's off screen left or right, but that's not our problem)
-                sprites.append((offset, spriteY))
+                sprites.append((offset * BYTES_PER_OAM, spriteY))
             }
             
             if sprites.count == 10 {
@@ -657,7 +668,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
     // MARK: - Private methods to help us find stuff in memory
     
     private func findSpriteDataAddress(_ index: UInt8) -> Address {
-        return MemoryLocations.videoRAMRange.lowerBound + UInt16(index) * 8
+        return MemoryLocations.videoRAMRange.lowerBound + UInt16(index) * UInt16(BYTES_PER_TILE)
     }
     
     private func findBackgroundWindowAddress(_ index: UInt8) -> Address {
@@ -665,7 +676,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
         let base = Int(spriteStyleAddressing ? MemoryLocations.videoRAMRange.lowerBound : MemoryLocations.videoRAMHighBlock)
         let offset = spriteStyleAddressing ? Int(index) : Int(Int8(bitPattern: index))
         
-        return UInt16(base + offset * 16)   // 8 lines * 2 bitplanes
+        return UInt16(base + offset * BYTES_PER_TILE)
     }
     
     // MARK: - Other private drawing helper methods
