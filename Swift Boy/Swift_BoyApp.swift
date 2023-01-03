@@ -30,12 +30,20 @@ struct Swift_BoyApp: App {
     
     init() {
         // The file we want to load
-   
-//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/halt_bug.gb")
-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
+
+//         let romURL = URL(filePath: "/Users/michael/Downloads/mooneye/manual-only/sprite_priority.gb")
+//         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Dr. Mario.gb")
+//         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
+        let romURL = URL(filePath: "/Users/michael/Downloads/GB/Super Mario Land.gb")
+//        let romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
+//+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
-//CGB        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/interrupt_time/interrupt_time.gb")
-        
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/mem_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/01-read_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/02-write_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/03-modify_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/oam_bug/oam_bug.gb")
+
         do {
             // Create stuff
             
@@ -50,7 +58,7 @@ struct Swift_BoyApp: App {
             // Start things running
             
             backgroundTask = Task.detached(priority: .userInitiated) {
-                boy.run()
+                await boy.run()
             }
         } catch {
             fatalError(error.localizedDescription)

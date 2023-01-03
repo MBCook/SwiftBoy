@@ -20,6 +20,11 @@ let GAMEBOY_DOCTOR = false
 let BLARGG_TEST_ROMS = false
 let CONSOLE_DISPLAY = false
 
+let CORRECT_FRAME_TIME_SECONDS = 1.0 / 60.0     // Aim for 60 frames per second
+let FRAME_SAMPLE_COUNT = 10
+let NANOSECONDS_IN_SECOND: Double = 1_000_000_000
+let NANOSECONDS_IN_MILLISECOND: UInt64 = 1_000_000
+
 class SwiftBoy: ObservableObject {
     // MARK: - Our private variables
     
@@ -30,10 +35,15 @@ class SwiftBoy: ObservableObject {
     private var ppu: PPU
     private var joypad: Joypad
     
-    private var paused: Bool
     private var logFile: FileHandle?
     
     private var screenCancellable: AnyCancellable!
+    
+    private var ticksUsed: Ticks
+    private var paused: Bool
+    private var frameCounter: Int
+    
+    private var frameTimes: [TimeInterval]!
     
     // MARK: - Our published variables
     
@@ -43,6 +53,13 @@ class SwiftBoy: ObservableObject {
     // MARK: - Our public interface
     
     init(cartridge: Cartridge) throws {
+        // Mark that we haven't run any instructions yet or done anything
+        
+        ticksUsed = 0
+        frameCounter = 0
+        paused = false
+        frameTimes = Array(repeating: 1, count: FRAME_SAMPLE_COUNT)
+        
         // Create the various objects we need and wire them up
         
         timer = Timer()
@@ -58,8 +75,6 @@ class SwiftBoy: ObservableObject {
         
         cpu = CPU(memory: memory, interruptController: interruptController)
         
-        paused = false
-        
         screen = renderFrame(nil)
         
         screenCancellable = ppu.$currentFrame.sink { [self] data in
@@ -72,10 +87,23 @@ class SwiftBoy: ObservableObject {
     }
     
     func pause() {
+        print("Pausing")
         paused = true
     }
     
+    func unpause() {
+        print("Unpausing")
+        paused = false
+    }
+    
     func reset() {
+        // Since we're starting again, no ticks have occurred
+        
+        ticksUsed = 0
+        frameCounter = 0
+        paused = false
+        frameTimes = Array(repeating: 1, count: FRAME_SAMPLE_COUNT)
+        
         // Just call reset on all the objects and render a blank screen
         
         timer.reset()
@@ -89,6 +117,13 @@ class SwiftBoy: ObservableObject {
     }
     
     func loadGameAndReset(_ cartridge: Cartridge) {
+        // Since we're starting again, no ticks have occurred
+        
+        ticksUsed = 0
+        frameCounter = 0
+        paused = false
+        frameTimes = Array(repeating: 1, count: FRAME_SAMPLE_COUNT)
+        
         // Just call reset on all the objects except memory, which gets the new cartridge, then render a blank screen
         
         timer.reset()
@@ -102,7 +137,7 @@ class SwiftBoy: ObservableObject {
     }
     
     // The main runloop
-    func run() {
+    func run() async {
         // Make sure the log file will be closed if it exists
         
         defer {
@@ -130,17 +165,52 @@ class SwiftBoy: ObservableObject {
             logFile = FileHandle(forWritingAtPath: path)
         }
         
-        // We were asked to run, so paused needs to be false
-        
-        paused = false
-        
         // Inform the populace!
         
         print("Starting")
         
-        var ticksUsed: Cycles = 0
+        while !paused {
+            let frameStart = Date.now
+            
+            runForOneFrame()
+            
+            var frameIntervalSeconds = Date.now.timeIntervalSince(frameStart)  // Seconds since the frame started
+            
+            if frameIntervalSeconds < CORRECT_FRAME_TIME_SECONDS {
+                let delayNanoseconds = UInt64((CORRECT_FRAME_TIME_SECONDS - frameIntervalSeconds) * NANOSECONDS_IN_SECOND)
+                
+                // The extra millisecond we take off gets us to almost exactly 60 FPs
+                try! await Task.sleep(nanoseconds: delayNanoseconds - NANOSECONDS_IN_MILLISECOND)
+                
+                frameIntervalSeconds = Date.now.timeIntervalSince(frameStart)  // If we were running too fast, include the sleep
+            }
+            
+            frameCounter &+= 1
+            
+            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameIntervalSeconds
+            
+            if frameCounter % 60 == 0 {
+                printFrameStats()
+            }
+        }
+    }
+    
+    // MARK: - Private methods
+    
+    private func printFrameStats() {
+        let tenFrameSum = frameTimes.reduce(0, +)
+        let tenFrameAverage = tenFrameSum / 10
         
-        while true {
+        let fps = 1 / (tenFrameSum / Double(FRAME_SAMPLE_COUNT))
+        let averageFrameTimeMS = tenFrameAverage * 1000
+        
+        print(String(format: "FPS: %.2f, Time: %.2fms", fps, averageFrameTimeMS))
+    }
+    
+    private func runForOneFrame() {
+        var vblankOccurred = false
+        
+        while !vblankOccurred {
             // First update the timer
             
             let timerInterrupt = timer.tick(ticksUsed)
@@ -159,6 +229,13 @@ class SwiftBoy: ObservableObject {
             
             if let lcdInterrupts {
                 lcdInterrupts.forEach { interruptController.raiseInterrupt($0) }
+                
+                if lcdInterrupts.contains(.vblank) {
+                    // We stop after each VBlank so we can cap our framerate
+                    // We'll actually excute one more instruction, but that's harmless
+                    
+                    vblankOccurred = true
+                }
             }
             
             // Print some debug stuff if in Gameboy Doctor mode
@@ -170,13 +247,6 @@ class SwiftBoy: ObservableObject {
                     print("Error writing to log file! \(error.localizedDescription)")
                     exit(1)
                 }
-            }
-            
-            // We about to do the next instruction. Don't do that if we need to pause
-            
-            if paused {
-                print("Pausing")
-                return
             }
             
             // Ok then, we need to execute the next opcode
@@ -192,8 +262,6 @@ class SwiftBoy: ObservableObject {
             }
         }
     }
-    
-    // MARK: - Private methods
     
     private func renderFrame(_ data: Data?) -> Image {
         guard data != nil else {
