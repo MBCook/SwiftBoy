@@ -21,7 +21,7 @@ let BLARGG_TEST_ROMS = false
 let CONSOLE_DISPLAY = false
 
 let CORRECT_FRAME_TIME_SECONDS = 1.0 / 60.0     // Aim for 60 frames per second
-let FRAME_SAMPLE_COUNT = 10
+let FRAME_SAMPLE_COUNT = 60
 let NANOSECONDS_IN_SECOND: Double = 1_000_000_000
 let NANOSECONDS_IN_MILLISECOND: UInt64 = 1_000_000
 
@@ -198,13 +198,15 @@ class SwiftBoy: ObservableObject {
     // MARK: - Private methods
     
     private func printFrameStats() {
-        let tenFrameSum = frameTimes.reduce(0, +)
-        let tenFrameAverage = tenFrameSum / 10
+        let frameTimeSum = frameTimes.reduce(0, +)
+        let frameTimeAverage = frameTimeSum / Double(FRAME_SAMPLE_COUNT)
+        let minimumTime = frameTimes.min()! / frameTimeAverage * 100
+        let maximumTime = frameTimes.max()! / frameTimeAverage * 100
         
-        let fps = 1 / (tenFrameSum / Double(FRAME_SAMPLE_COUNT))
-        let averageFrameTimeMS = tenFrameAverage * 1000
+        let fps = 1 / (frameTimeSum / Double(FRAME_SAMPLE_COUNT))
+        let averageFrameTimeMS = frameTimeAverage * 1000
         
-        print(String(format: "FPS: %.2f, Time: %.2fms", fps, averageFrameTimeMS))
+        print(String(format: "FPS: %.2f, Time: %.2fms, Min: %.2f%%, Max: %.2f%%", fps, averageFrameTimeMS, minimumTime, maximumTime))
     }
     
     private func runForOneFrame() {
