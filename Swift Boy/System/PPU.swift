@@ -377,24 +377,36 @@ class PPU: MemoryMappedDevice, ObservableObject {
         var finalPixels = Array(repeating: LCDColors.white, count: PIXELS_WIDE)     // Initial value before we combine things
         
         for x in 0..<PIXELS_WIDE {
-            let bgWindowColor = windowColors?[x] ?? bgColors?[x]        // Window if we have it, BG if not, nil if neither
-            let bgWindowWasZero = windowWasZero?[x] ?? bgWasZero?[x]    // Same thing with if the color was zero
-            let spriteColor = spriteColors[x]                           // The sprite pixel if there is one
-            let spriteBGPriority = backgroundPriority[x]                // If that sprite pixel has BG priority on it
+            // Get the background and window colors at this pixel
+            let bgColor = bgColors?[x]
+            let windowColor = windowColors?[x]
+            
+            // And if they were color zero before the palette was applied
+            let bgZero = bgWasZero?[x]
+            let windowZero = windowWasZero?[x]
+            
+            // Take the window colors over the background colors, if we have a choice
+            let bgWindowColor = windowColor ?? bgColor
+            let wasZero = windowColor != nil ? windowZero : bgZero
+            
+            // Now the sprite color at this pixel and if that particular sprite had BG priority set
+            let spriteColor = spriteColors[x]
+            let spriteBGPriority = backgroundPriority[x]
             
             // What we do depends on if there is background priority
             
-            if spriteBGPriority && bgWindowWasZero == true {
-                // A non-zero background or window pixel will cover the sprite. Since bgWindowWasZero is not nil, the color won't be
+            if spriteBGPriority && bgWindowColor != nil && wasZero == false  {
+                // A non-zero background/window pixel will cover the sprite.
                 
                 finalPixels[x] = bgWindowColor!
             } else if let spriteColor {
-                // The sprite has priority, or the background/window was index 0 which is always behind the sprite
+                // The sprite has priority, or the background/window was index 0 (or none) which is always behind the sprite anyway
                 
                 finalPixels[x] = spriteColor
             } else if let bgWindowColor {
-                // Last chance. No sprite pixel (or it was transparent) so it's background/window time.
-                // If those are off, the default white color we set when creating the array wins.
+                // There was no sprite pixel, or it was transparent (nil). So we'll show the background or window color.
+                // If this test doesn't pass, it means nothing covers the pixel at all. That means it will be the default
+                // set above, which is the color white.
                 
                 finalPixels[x] = bgWindowColor
             }
