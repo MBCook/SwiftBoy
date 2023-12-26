@@ -36,6 +36,7 @@ enum MemoryLocations {
     static let serialControl: Address = 0xFF02
     static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07
     static let interruptFlags: Address = 0xFF0F
+    static let audioRange: ClosedRange<Address> = 0xFF10...0xFF26
     static let lcdRegisterRange: ClosedRange<Address> = 0xFF40...0xFF4B
     static let dmaRegister: Address = 0xFF46
     
@@ -53,6 +54,7 @@ private enum MemorySection {
     case timerRegisters
     case ioRegisters
     case joypad
+    case audio
     case lcdRegisters
     case dmaRegister
     case highRAM
@@ -63,6 +65,7 @@ private enum MemorySection {
 protocol MemoryMappedDevice {
     func readRegister(_ address: Address) -> UInt8
     func writeRegister(_ address: Address, _ value: UInt8)
+    func reset()
 }
 
 class Memory {
@@ -79,16 +82,18 @@ class Memory {
     private let interruptController: InterruptController
     private let ppu: PPU
     private let joypad: Joypad
+    private let audio: Audio
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad, audio: Audio) {
         // Save references to the other objects
         
         self.timer = timer
         self.interruptController = interruptController
         self.ppu = ppu
         self.joypad = joypad
+        self.audio = audio
         
         // Load the game and reset our state
         
@@ -134,6 +139,8 @@ class Memory {
                 return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
             case .joypad:
                 return joypad.readRegister(index)
+            case .audio:
+                return audio.readRegister(index)
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
@@ -184,6 +191,8 @@ class Memory {
                 ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
             case .joypad:
                 joypad.writeRegister(index, value)
+            case .audio:
+                audio.writeRegister(index, value)
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptController:
@@ -210,6 +219,8 @@ class Memory {
             return .dmaRegister
         case MemoryLocations.lcdRegisterRange:
             return .lcdRegisters
+        case MemoryLocations.audioRange:
+            return .audio
         case MemoryLocations.interruptEnable, MemoryLocations.interruptFlags:
             return .interruptController
         case MemoryLocations.ioRegisterRange:

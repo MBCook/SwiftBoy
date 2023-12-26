@@ -34,6 +34,7 @@ class SwiftBoy: ObservableObject {
     private var interruptController: InterruptController
     private var ppu: PPU
     private var joypad: Joypad
+    private var audio: Audio
     
     private var logFile: FileHandle?
     
@@ -64,12 +65,18 @@ class SwiftBoy: ObservableObject {
         
         timer = Timer()
         joypad = Joypad()
+        audio = Audio()
         interruptController = InterruptController()
         
         let dmaController = DMAController()
 
         ppu = PPU(dmaController: dmaController)
-        memory = Memory(cartridge: cartridge, timer: timer, interruptController: interruptController, ppu: ppu, joypad: joypad)
+        memory = Memory(cartridge: cartridge,
+                        timer: timer,
+                        interruptController: interruptController,
+                        ppu: ppu,
+                        joypad: joypad,
+                        audio: audio)
         
         dmaController.setMemory(memory: memory)
         
@@ -108,6 +115,7 @@ class SwiftBoy: ObservableObject {
         
         timer.reset()
         joypad.reset()
+        audio.reset()
         interruptController.reset()
         ppu.reset()
         memory.reset()
@@ -128,6 +136,7 @@ class SwiftBoy: ObservableObject {
         
         timer.reset()
         joypad.reset()
+        audio.reset()
         interruptController.reset()
         ppu.reset()
         memory.loadGameAndReset(cartridge)
@@ -239,6 +248,10 @@ class SwiftBoy: ObservableObject {
                     vblankOccurred = true
                 }
             }
+            
+            // Run the audio for one frame
+            
+            audio.tick(ticksUsed)
             
             // Print some debug stuff if in Gameboy Doctor mode
             
