@@ -82,18 +82,18 @@ class Memory {
     private let interruptController: InterruptController
     private let ppu: PPU
     private let joypad: Joypad
-    private let audio: Audio
+    private let apu: APU
     
     // MARK: Public methods
     
-    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad, audio: Audio) {
+    init(cartridge: Cartridge, timer: Timer, interruptController: InterruptController, ppu: PPU, joypad: Joypad, apu: APU) {
         // Save references to the other objects
         
         self.timer = timer
         self.interruptController = interruptController
         self.ppu = ppu
         self.joypad = joypad
-        self.audio = audio
+        self.apu = apu
         
         // Load the game and reset our state
         
@@ -140,7 +140,7 @@ class Memory {
             case .joypad:
                 return joypad.readRegister(index)
             case .audio:
-                return audio.readRegister(index)
+                return apu.readRegister(index)
             case .externalRAM:
                 return cartridge.readFromRAM(index)
             case .workRAM:
@@ -192,7 +192,7 @@ class Memory {
             case .joypad:
                 joypad.writeRegister(index, value)
             case .audio:
-                audio.writeRegister(index, value)
+                apu.writeRegister(index, value)
             case .highRAM:
                 highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
             case .interruptController:

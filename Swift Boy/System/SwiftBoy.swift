@@ -15,6 +15,7 @@ typealias Cycles = UInt8
 typealias Register = UInt8
 typealias RegisterPair = UInt16
 typealias Ticks = UInt8
+typealias VolumeLevel = UInt8
 
 let GAMEBOY_DOCTOR = false
 let BLARGG_TEST_ROMS = false
@@ -34,7 +35,7 @@ class SwiftBoy: ObservableObject {
     private var interruptController: InterruptController
     private var ppu: PPU
     private var joypad: Joypad
-    private var audio: Audio
+    private var apu: APU
     
     private var logFile: FileHandle?
     
@@ -65,7 +66,7 @@ class SwiftBoy: ObservableObject {
         
         timer = Timer()
         joypad = Joypad()
-        audio = Audio()
+        apu = APU()
         interruptController = InterruptController()
         
         let dmaController = DMAController()
@@ -76,7 +77,7 @@ class SwiftBoy: ObservableObject {
                         interruptController: interruptController,
                         ppu: ppu,
                         joypad: joypad,
-                        audio: audio)
+                        apu: apu)
         
         dmaController.setMemory(memory: memory)
         
@@ -115,7 +116,7 @@ class SwiftBoy: ObservableObject {
         
         timer.reset()
         joypad.reset()
-        audio.reset()
+        apu.reset()
         interruptController.reset()
         ppu.reset()
         memory.reset()
@@ -136,7 +137,7 @@ class SwiftBoy: ObservableObject {
         
         timer.reset()
         joypad.reset()
-        audio.reset()
+        apu.reset()
         interruptController.reset()
         ppu.reset()
         memory.loadGameAndReset(cartridge)
@@ -251,7 +252,7 @@ class SwiftBoy: ObservableObject {
             
             // Run the audio for one frame
             
-            audio.tick(ticksUsed)
+            apu.tick(ticksUsed)
             
             // Print some debug stuff if in Gameboy Doctor mode
             

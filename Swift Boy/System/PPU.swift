@@ -785,6 +785,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
         switch address {
         case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
             // During these times the memory is blocked and you can't write
+            
             return
         case MemoryLocations.objectAttributeMemoryRange:
             // The rest of the time writing is OK
@@ -796,9 +797,8 @@ class PPU: MemoryMappedDevice, ObservableObject {
             return
         case MemoryLocations.videoRAMRange:
             // You're allowed to access video RAM during this time, so have at it
+            
             videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)] = value
-
-            return
         case LCD_CONTROL:
             // When the LCD is disabled we'll set our internal state so it's sane on restart
             
@@ -808,7 +808,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
                 ppuMode = PPUMode.verticalBlank         // We'll be in the vertical blank
             }
             
-            return lcdControl = value
+            lcdControl = value
         case LCD_STATUS:
             lcdStatus = value
         case VIEWPORT_Y:
@@ -817,6 +817,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
             viewportX = value
         case LCD_Y_COORDINATE:
             // Read-only, sorry
+            
             return
         case LCD_Y_COMPARE:
             lcdYCompare = value
