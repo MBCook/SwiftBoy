@@ -14,7 +14,7 @@ typealias Bitmask = UInt8
 typealias Cycles = UInt8
 typealias Register = UInt8
 typealias RegisterPair = UInt16
-typealias Ticks = UInt8
+typealias Ticks = UInt8             // A tick is 1 cycle at 2^20th HZ (~1 MHz), which is the length of the shortest CPU instruction (e.g. nop)
 typealias VolumeLevel = UInt8
 
 let GAMEBOY_DOCTOR = false
