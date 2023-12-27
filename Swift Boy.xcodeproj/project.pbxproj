@@ -27,6 +27,8 @@
 		4C92EA14294D52F800412D30 /* DMAController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C92EA13294D52F800412D30 /* DMAController.swift */; };
 		4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC3277E2B3B5AD0009074DD /* APU.swift */; };
 		4CC327822B3CB4B8009074DD /* PulseWithPeriodSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */; };
+		4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327832B3CE4C7009074DD /* NoiseChannel.swift */; };
+		4CC327862B3CE74A009074DD /* WaveChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327852B3CE74A009074DD /* WaveChannel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +56,8 @@
 		4C92EA13294D52F800412D30 /* DMAController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMAController.swift; sourceTree = "<group>"; };
 		4CC3277E2B3B5AD0009074DD /* APU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APU.swift; sourceTree = "<group>"; };
 		4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseWithPeriodSweep.swift; sourceTree = "<group>"; };
+		4CC327832B3CE4C7009074DD /* NoiseChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseChannel.swift; sourceTree = "<group>"; };
+		4CC327852B3CE74A009074DD /* WaveChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveChannel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -150,6 +154,8 @@
 			isa = PBXGroup;
 			children = (
 				4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */,
+				4CC327832B3CE4C7009074DD /* NoiseChannel.swift */,
+				4CC327852B3CE74A009074DD /* WaveChannel.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -232,10 +238,12 @@
 				4C13DD4F29416BD800C8786C /* Utility.swift in Sources */,
 				4CC327822B3CB4B8009074DD /* PulseWithPeriodSweep.swift in Sources */,
 				4C318A8529455B84006F9377 /* Cartridge.swift in Sources */,
+				4CC327862B3CE74A009074DD /* WaveChannel.swift in Sources */,
 				4C92EA14294D52F800412D30 /* DMAController.swift in Sources */,
 				4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */,
 				4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
+				4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */,
 				4C318A8A29467265006F9377 /* MBC1.swift in Sources */,
 				4C318A8C2946B272006F9377 /* PPU.swift in Sources */,
 				4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */,

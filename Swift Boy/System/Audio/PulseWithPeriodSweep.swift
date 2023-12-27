@@ -152,9 +152,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         onFirstTrigger = false
     }
     
-    func apuDisabled() {
-        // Clear all registers but the master control register
-        
+    func apuDisabled() {        
         sweepRegister = 0x00
         lengthAndDutyCycleRegister = 0x00
         volumeAndEnvelopeRegister = 0x00
