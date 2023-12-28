@@ -37,7 +37,7 @@ class NoiseChannel: MemoryMappedDevice {
     
     private var lengthRegister: Register {
         get {
-            return 0xC0 + initialLengthTimer   // Top bits are always 1
+            return 0xFF     // Write only register, so always returns 0xFF
         }
         set (value) {
             initialLengthTimer = value & 0x3F  // Skip the top two bits
@@ -80,9 +80,9 @@ class NoiseChannel: MemoryMappedDevice {
     
     private var controlRegister: Register {
         get {
-            return 0xF0                         // High bit is always set since it's not readable
+            return 0x80                         // High bit is always set since it's not readable
                     + (lengthEnable ? 0x40 : 0x00)
-                    + 0x1F                      // Bottom bits aren't used either
+                    + 0x3F                      // Bottom bits aren't used either
         }
         set (value) {
             lengthEnable = value & 0x40 == 0x40
@@ -104,7 +104,7 @@ class NoiseChannel: MemoryMappedDevice {
         controlRegister = 0xBF
     }
     
-    func apuDisabled() {
+    func disableAPU() {
         lengthRegister = 0x00
         volumeAndEnvelopeRegister = 0x00
         frequencyAndRandomnessRegister = 0x00

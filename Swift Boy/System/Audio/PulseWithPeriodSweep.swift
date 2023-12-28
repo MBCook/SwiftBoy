@@ -111,7 +111,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     
     private var periodLowRegister: Register {
         get {
-            return UInt8(period & 0x00FF)
+            return 0xFF     // Write only register, so always returns 0xFF
         }
         set (value) {
             period = period & 0xFF00 + UInt16(value)
@@ -120,10 +120,9 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     
     private var periodHighAndControlRegister: Register {
         get {
-            return 0xF0                         // High bit is always set since it's not readable
+            return 0x80                         // High bit is always set since it's not readable
                     + (periodLengthEnable ? 0x40 : 0x00)
-                    + 0x38                      // These three bits aren't used either, so they're 1s
-                    + UInt8(period >> 8)    // Top 3 bits
+                    + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
             periodLengthEnable = value & 0x40 == 0x40
@@ -140,11 +139,23 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     func reset() {
         // Set things to the boot state
         
-        sweepRegister = 0x80
-        lengthAndDutyCycleRegister = 0xBF
-        volumeAndEnvelopeRegister = 0xF3
-        periodLowRegister = 0xFF
-        periodHighAndControlRegister = 0xBF
+        if enableSweep {
+            // Channel 1
+            
+            sweepRegister = 0x80
+            lengthAndDutyCycleRegister = 0xBF
+            volumeAndEnvelopeRegister = 0xF3
+            periodLowRegister = 0xFF
+            periodHighAndControlRegister = 0xBF
+        } else {
+            // Channel 2
+            
+            sweepRegister = 0x00
+            lengthAndDutyCycleRegister = 0x3F
+            volumeAndEnvelopeRegister = 0x00
+            periodLowRegister = 0xFF
+            periodHighAndControlRegister = 0xBF
+        }
         
         dutyStep = 0
         
@@ -152,7 +163,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         onFirstTrigger = false
     }
     
-    func apuDisabled() {        
+    func disableAPU() {        
         sweepRegister = 0x00
         lengthAndDutyCycleRegister = 0x00
         volumeAndEnvelopeRegister = 0x00

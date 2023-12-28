@@ -36,7 +36,7 @@ enum MemoryLocations {
     static let serialControl: Address = 0xFF02
     static let timerRegistersRange: ClosedRange<Address> = 0xFF04...0xFF07
     static let interruptFlags: Address = 0xFF0F
-    static let audioRange: ClosedRange<Address> = 0xFF10...0xFF26
+    static let audioRange: ClosedRange<Address> = 0xFF10...0xFF3F
     static let lcdRegisterRange: ClosedRange<Address> = 0xFF40...0xFF4B
     static let dmaRegister: Address = 0xFF46
     

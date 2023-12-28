@@ -199,6 +199,8 @@ class CPU {
 //
         // Run the operation, updating the program counter and the number of ticks that were used
             
+        print(generateDebugLogLine())
+        
         let lastPC = pc
         
         (pc, ticksUsed) = try executeOpcode(op)
@@ -210,8 +212,6 @@ class CPU {
             
             pc = lastPC
         }
-        
-//        print(generateDebugLogLine())
         
         // Inform our caller
         
@@ -225,9 +225,19 @@ class CPU {
         //
         // The stuff after PCMEM are the values at PC+1, PC+2, PC+3, and PC+4 in memory
         
+        let nextOpcode = memory[pc]
+        let afterThat = memory[pc] + 1
+        
+        let zero = flags & Flags.zero.rawValue > 0 ? "Z" : "_"
+        let sub = flags & Flags.subtraction.rawValue > 0 ? "S" : "_"
+        let half = flags & Flags.halfCarry.rawValue > 0 ? "H" : "_"
+        let carry = flags & Flags.carry.rawValue > 0 ? "C" : "_"
+        
         return "A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
               "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp)) PC:\(toHex(pc)) " +
-              "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))\n"
+              "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))" +
+              "\t" + zero + sub + half + carry +
+              "\t" + getOpcode(nextOpcode, afterThat)
     }
     
     // MARK: - Private helper functions

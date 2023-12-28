@@ -60,7 +60,7 @@ class CartridgeHelper {
         switch type {
         case 0x00:
             cartridge = NoMapper.self
-        case 0x01, 0x02:
+        case 0x01, 0x02, 0x03:          // TODO: We're ignoring the battery on 0x03! Oh no!
             cartridge = MBC1.self
         default:
             throw CartridgeErrors.UnsupportedCartridgeType(type)

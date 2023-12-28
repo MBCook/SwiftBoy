@@ -20,6 +20,14 @@ private let AUDIO_CONTROL: Address = 0xFF26
 private let SOUND_PANNING: Address = 0xFF25
 private let MASTER_VOLUME: Address = 0xFF24
 
+private enum AudioMasterControl {
+    static let audioOn: UInt8 = 0x80
+    static let channelFourOn: UInt8 = 0x08
+    static let channelThreeOn: UInt8 = 0x04
+    static let channelTwoOn: UInt8 = 0x02
+    static let channelOneOn: UInt8 = 0x01
+}
+
 private enum SoundPanning {
     static let channelFourLeft: UInt8 = 0x80
     static let channelThreeLeft: UInt8 = 0x40
@@ -83,7 +91,7 @@ class APU: MemoryMappedDevice {
             if (!turningOn) {
                 // TODO: Clear stuff when this is turned off, see PAN docs
                 
-                apuDisabled()
+                disableAPU()
             }
         }
     }
@@ -115,15 +123,22 @@ class APU: MemoryMappedDevice {
         masterVolumeRegister = 0xF1
     }
     
-    func apuDisabled() {
+    func disableAPU() {
+        guard apuEnabled else {
+            return
+        }
+        
         // Clear all registers but the master control register
         
-        channelOne.apuDisabled()
-        channelTwo.apuDisabled()
-        channelThree.apuDisabled()
-        channelFour.apuDisabled()
+        channelOne.disableAPU()
+        channelTwo.disableAPU()
+        channelThree.disableAPU()
+        channelFour.disableAPU()
         
-        audioControlRegister = 0x00
+        // Note: We CAN NOT write to audioControlRegister, that will cause infinite recursion
+        
+        apuEnabled = false              // The only thing in audioControlRegister
+        
         soundPanningRegister = 0x00
         masterVolumeRegister = 0x00
     }
@@ -160,8 +175,8 @@ class APU: MemoryMappedDevice {
     }
     
     func writeRegister(_ address: Address, _ value: UInt8) {
-        guard apuEnabled || WRITABLE_WHILE_APU_DISABLED.contains(address) else {
-            // Only the audio control register and the timer length registers can be written when the APU is off
+        guard apuEnabled || WRITABLE_WHILE_APU_DISABLED.contains(address) || WAVE_PATTERN_RANGE.contains(address) else {
+            // Only the audio control register, the timer length registers, and the wave pattern can be written when the APU is off
             return
         }
         
