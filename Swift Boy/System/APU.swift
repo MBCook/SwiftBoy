@@ -14,8 +14,6 @@ private let CHANNEL_FOUR_RANGE: ClosedRange<Address> = 0xFF20...0xFF23
 
 private let WAVE_PATTERN_RANGE: ClosedRange<Address> = 0xFF30...0xFF3F
 
-private let WRITABLE_WHILE_APU_DISABLED: [Address] = [0xFF11, 0xFF16, 0xFF1B, 0xFF20, 0xFF26]
-
 private let AUDIO_CONTROL: Address = 0xFF26
 private let SOUND_PANNING: Address = 0xFF25
 private let MASTER_VOLUME: Address = 0xFF24
@@ -89,13 +87,11 @@ class APU: MemoryMappedDevice {
         set (value) {
             // Only bit 7 matters, all the rest are ignored on writes
             
-            let turningOn = (value & 0x80) == 0x80
-            
-            apuEnabled = turningOn
-            
-            if (!turningOn) {
-                // TODO: Clear stuff when this is turned off, see PAN docs
-                
+            if (value & 0x80 == 0x80) {
+                // We need to make sure the APU is disabled
+                enableAPU()
+            } else {
+                // We need to make sure the APU is disabled
                 disableAPU()
             }
         }
@@ -133,10 +129,22 @@ class APU: MemoryMappedDevice {
         masterVolumeRegister = 0xF1
     }
     
+    func enableAPU() {
+        guard !apuEnabled else {
+            return
+        }
+        
+        apuEnabled = true
+        
+        // TODO: Other stuff?
+    }
+    
     func disableAPU() {
         guard apuEnabled else {
             return
         }
+        
+        // TODO: Clear stuff when this is turned off, see PAN docs
         
         // Clear all registers but the master control register
         
@@ -185,7 +193,7 @@ class APU: MemoryMappedDevice {
     }
     
     func writeRegister(_ address: Address, _ value: UInt8) {
-        guard apuEnabled || WRITABLE_WHILE_APU_DISABLED.contains(address) || WAVE_PATTERN_RANGE.contains(address) else {
+        guard apuEnabled || address == AUDIO_CONTROL || WAVE_PATTERN_RANGE.contains(address) else {
             // Only the audio control register, the timer length registers, and the wave pattern can be written when the APU is off
             return
         }

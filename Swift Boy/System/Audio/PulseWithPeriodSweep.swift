@@ -164,6 +164,8 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     }
     
     func disableAPU() {        
+        disableDAC()
+        
         sweepRegister = 0x00
         lengthAndDutyCycleRegister = 0x00
         volumeAndEnvelopeRegister = 0x00
@@ -224,7 +226,9 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     }
     
     private func disable() {
+        // TODO: This
         
+        enabled = false
     }
     
     private func enableDAC() {

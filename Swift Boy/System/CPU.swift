@@ -199,7 +199,7 @@ class CPU {
 //
         // Run the operation, updating the program counter and the number of ticks that were used
         
-        print(generateDebugLogLine())
+//        print(generateDebugLogLine())
         
         let lastPC = pc
         
