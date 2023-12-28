@@ -68,6 +68,11 @@ class APU: MemoryMappedDevice {
     private var leftVolume: Register = 0
     private var rightVolume: Register = 0
     
+    // We don't support VIN, but need to track these in case a games care
+    
+    private var vinLeft: Bool = false
+    private var vinRight: Bool = false
+    
     // MARK: - Registers
     
     private var audioControlRegister: Register {
@@ -100,10 +105,15 @@ class APU: MemoryMappedDevice {
     
     private var masterVolumeRegister: Register {        // We're not going to bother with the cartridge sound/VIN since no one used that
         get {
-            return (leftVolume << 4) + rightVolume
+            return (vinLeft ? 0x80 : 0x00)
+                    + (leftVolume << 4)
+                    + (vinRight ? 0x08 : 0x00)
+                    + rightVolume
         }
         set(value) {
+            vinLeft = (value & 0x80) == 0x80
             leftVolume = (value & 0x70) >> 4    // Bits 4-6
+            vinRight = (value & 0x08) == 0x08
             rightVolume = value & 0x07          // Last 3 bits
         }
     }

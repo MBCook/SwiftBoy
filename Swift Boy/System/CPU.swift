@@ -198,7 +198,7 @@ class CPU {
 //        }
 //
         // Run the operation, updating the program counter and the number of ticks that were used
-            
+        
         print(generateDebugLogLine())
         
         let lastPC = pc
@@ -221,7 +221,7 @@ class CPU {
     func generateDebugLogLine() -> String {
         // Write a log line like this:
         //
-        // A:00 F:11 B:22 C:33 D:44 E:55 H:66 L:77 SP:8888 PC:9999 PCMEM:AA,BB,CC,DD
+        // PC:C664    _S_C    OR A, C         A:FC F:50 B:FC C:ED D:CA E:9B H:C5 L:93 SP:DFEE    PCMEM:B1,28,06,F0
         //
         // The stuff after PCMEM are the values at PC+1, PC+2, PC+3, and PC+4 in memory
         
@@ -233,11 +233,15 @@ class CPU {
         let half = flags & Flags.halfCarry.rawValue > 0 ? "H" : "_"
         let carry = flags & Flags.carry.rawValue > 0 ? "C" : "_"
         
-        return "A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
-              "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp)) PC:\(toHex(pc)) " +
-              "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))" +
-              "\t" + zero + sub + half + carry +
-              "\t" + getOpcode(nextOpcode, afterThat)
+        let instruction = getOpcode(nextOpcode, afterThat)
+        let padToTwelve = String.init(repeating: " ", count: 12 - instruction.count)
+        
+        return "PC:\(toHex(pc))    " +
+                zero + sub + half + carry + "    " +
+                instruction + padToTwelve + "\t" +
+                "A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
+                "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp))    " +
+                "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))"
     }
     
     // MARK: - Private helper functions
