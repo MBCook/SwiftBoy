@@ -64,9 +64,9 @@ class SwiftBoy: ObservableObject {
         
         // Create the various objects we need and wire them up
         
-        timer = Timer()
-        joypad = Joypad()
         apu = APU()
+        timer = Timer(apu: apu)
+        joypad = Joypad()
         interruptController = InterruptController()
         
         let dmaController = DMAController()

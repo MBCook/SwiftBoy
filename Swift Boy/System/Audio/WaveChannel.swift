@@ -22,16 +22,14 @@ private enum WavePatternVolume {
     static let quarter: UInt8 = 0x03
 }
 
-class WaveChannel: MemoryMappedDevice {
+class WaveChannel: AudioChannel {
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
     
-    private var initialLengthTimer: Register = 0
-    private var actualLengthTimer: Register = 0
+    private let lengthCounter: AudioLengthCounter
     
     private var outputLevel: Register = 0
     private var period: UInt16 = 0
-    private var periodLengthEnable: Bool = false
     
     private var wavePatternNibble: Register = 0
     private var wavePatternBuffer: Register = 0
@@ -58,7 +56,7 @@ class WaveChannel: MemoryMappedDevice {
             return 0xFF     // You can't read this back
         }
         set (value) {
-            initialLengthTimer = value
+            lengthCounter.initalLength = value
         }
     }
     
@@ -83,11 +81,11 @@ class WaveChannel: MemoryMappedDevice {
     private var periodHighAndControlRegister: Register {
         get {
             return 0x80                         // High bit is always set since it's not readable
-                    + (periodLengthEnable ? 0x40 : 0x00)
+                    + (lengthCounter.enabled ? 0x40 : 0x00)
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
-            periodLengthEnable = value & 0x40 == 0x40
+            lengthCounter.enabled = value & 0x40 == 0x40
             
             let lowBits = period & 0x00FF
             let highBits = (UInt16(value) & 0x07) << 8  // We're setting the top 3 bits, bottom 8 come from existing value
@@ -102,8 +100,14 @@ class WaveChannel: MemoryMappedDevice {
     
     private var wavePattern: [Register] = [Register](repeating: 0, count: 16)
     
+    // MARK: - Constructor
     
-    // MARK: - Public functions
+    init() {
+        self.lengthCounter = AudioLengthCounter(0xFF)                        // Max value is 255
+        self.lengthCounter.disableChannel = { self.disableChannel() }
+    }
+    
+    // MARK: - AudioChannel protocol functions
     
     func reset() {
         // Set things to the boot state
@@ -130,19 +134,35 @@ class WaveChannel: MemoryMappedDevice {
         wavePatternBuffer = 0
     }
     
+    func disableChannel() {
+        // TODO: This
+        
+        enabled = false
+    }
+    
     func isEnabled() -> Bool {
         return enabled
     }
-    
-    // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
         // TODO: This
     }
     
+    func tickAPU() {
+        // TODO: This
+    }
+    
+    func tickLengthCounter() {
+        lengthCounter.tickLengthCounter()
+    }
+    
+    func tickVolumeEnvelope() {
+        // TODO: This
+    }
+    
     // MARK: - Channel specific functions
     
-    func trigger() {
+    private func trigger() {
         guard dacEnabled else {
             return
         }
@@ -151,16 +171,14 @@ class WaveChannel: MemoryMappedDevice {
         
         wavePatternNibble = 0
         
+        // Tell the timer we were triggered
         
+        lengthCounter.trigger()
         
         // TODO: Fill this in
     }
     
-    func disable() {
-        
-    }
-    
-    func enableDAC() {
+    private func enableDAC() {
         guard !dacEnabled else {
             return
         }
@@ -168,12 +186,12 @@ class WaveChannel: MemoryMappedDevice {
         dacEnabled = true
     }
     
-    func disableDAC() {
+    private func disableDAC() {
         guard dacEnabled else {
             return
         }
         
-        disable()
+        disableChannel()
         dacEnabled = false
     }
     

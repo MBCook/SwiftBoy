@@ -25,7 +25,7 @@ private enum SweepDirection {
     case subtraction
 }
 
-class PulseWithPeriodSweep: MemoryMappedDevice {
+class PulseWithPeriodSweep: AudioChannel {
     // MARK: - Private variables
     
     private var sweepPace: Register = 0
@@ -36,9 +36,8 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     private var dutyStep: Register = 0
     private var awaitingFirstTrigger: Bool = false
     private var onFirstTrigger: Bool = false
-    
-    private var initialLengthTimer: Register = 0
-    private var actualLengthTimer: Register = 0
+
+    private let lengthCounter: AudioLengthCounter
     
     private var volume: Register = 0
     
@@ -46,7 +45,6 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     private var envelopePace: Register = 0
     
     private var period: RegisterPair = 0
-    private var periodLengthEnable: Bool = false
     
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
@@ -56,6 +54,9 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     // MARK: - Constructor
     
     init(enableSweep: Bool) {
+        self.lengthCounter = AudioLengthCounter(0x3F)                        // Max value is 63
+        self.lengthCounter.disableChannel = { self.disableChannel() }
+        
         self.enableSweep = enableSweep
     }
     
@@ -84,7 +85,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         }
         set (value) {
             dutyCycle = value >> 6
-            initialLengthTimer = value & 0x3F
+            lengthCounter.initalLength = value & 0x3F
         }
     }
     
@@ -121,11 +122,11 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
     private var periodHighAndControlRegister: Register {
         get {
             return 0x80                         // High bit is always set since it's not readable
-                    + (periodLengthEnable ? 0x40 : 0x00)
+                    + (lengthCounter.enabled ? 0x40 : 0x00)
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
-            periodLengthEnable = value & 0x40 == 0x40
+            lengthCounter.enabled = value & 0x40 == 0x40
             period = period & 0x00FF + (UInt16(value) & 0x07) << 8      // Take the bottom 3 bits, put them in place on Period
             
             if value & 0x80 == 0x80 {
@@ -134,7 +135,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         }
     }
     
-    // MARK: - Public functions
+    // MARK: - AudioChannel protocol functions
     
     func reset() {
         // Set things to the boot state
@@ -178,13 +179,35 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         onFirstTrigger = false
     }
     
+    func disableChannel() {
+        // TODO: This
+        
+        enabled = false
+    }
+    
     func isEnabled() -> Bool {
         return enabled
     }
     
-    // MARK: - Tick functions
-    
     func tick(_ ticks: Ticks) {
+        // TODO: This
+    }
+    
+    func tickAPU() {
+        // TODO: This
+    }
+    
+    func tickLengthCounter() {
+        lengthCounter.tickLengthCounter()
+    }
+    
+    func tickVolumeEnvelope() {
+        // TODO: This
+    }
+    
+    // MARK: - Public functions
+    
+    func tickSweep() {
         // TODO: This
     }
     
@@ -208,11 +231,9 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         
         enabled = true
         
-        // Ensure there is data in the length counter to count down from so we don't accidently turn ourselves off again
+        // Tell the timer we were triggered
         
-        if actualLengthTimer == 0 {
-            actualLengthTimer = 64      // Maximum possible for this channel
-        }
+        lengthCounter.trigger()
         
         // Reset the duty step index
         
@@ -223,12 +244,6 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         // TODO: Reload volume
         // TODO: Sweep stuff
         
-    }
-    
-    private func disable() {
-        // TODO: This
-        
-        enabled = false
     }
     
     private func enableDAC() {
@@ -246,7 +261,7 @@ class PulseWithPeriodSweep: MemoryMappedDevice {
         
         // Disabling the DAC also disables the channel
         
-        disable()
+        disableChannel()
         
         dacEnabled = false
     }

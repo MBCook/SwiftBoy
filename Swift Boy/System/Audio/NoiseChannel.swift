@@ -12,11 +12,10 @@ private let SC4_VOLUME_ENVELOPE: Address = 0xFF21
 private let SC4_FREQUENCY_RANDOMNESS: Address = 0xFF22
 private let SC4_CONTROL: Address = 0xFF23
 
-class NoiseChannel: MemoryMappedDevice {
+class NoiseChannel: AudioChannel {
     // MARK: - Private variables
     
-    private var initialLengthTimer: Register = 0
-    private var actualLengthTimer: Register = 0
+    private let lengthCounter: AudioLengthCounter
     
     private var volume: Register = 0
     private var envelopeDirection: Bool = false
@@ -24,8 +23,6 @@ class NoiseChannel: MemoryMappedDevice {
     
     private var clockShift: Register = 0
     private var clockDivider: Register = 0
-    
-    private var lengthEnable: Bool = false
     
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
@@ -40,7 +37,7 @@ class NoiseChannel: MemoryMappedDevice {
             return 0xFF     // Write only register, so always returns 0xFF
         }
         set (value) {
-            initialLengthTimer = value & 0x3F  // Skip the top two bits
+            lengthCounter.initalLength = value & 0x3F   // Skip the top two bits
         }
     }
     
@@ -81,11 +78,11 @@ class NoiseChannel: MemoryMappedDevice {
     private var controlRegister: Register {
         get {
             return 0x80                         // High bit is always set since it's not readable
-                    + (lengthEnable ? 0x40 : 0x00)
+                    + (lengthCounter.enabled ? 0x40 : 0x00)
                     + 0x3F                      // Bottom bits aren't used either
         }
         set (value) {
-            lengthEnable = value & 0x40 == 0x40
+            lengthCounter.enabled = value & 0x40 == 0x40
             
             if (value & 0x80) == 0x80 {
                 trigger()
@@ -93,7 +90,14 @@ class NoiseChannel: MemoryMappedDevice {
         }
     }
     
-    // MARK: - Public functions
+    // MARK: - Constructor
+    
+    init() {
+        self.lengthCounter = AudioLengthCounter(0x3F)                        // Max value is 63
+        self.lengthCounter.disableChannel = { self.disableChannel() }
+    }
+    
+    // MARK: - AudioChannel protocol functions
     
     func reset() {
         // Set things to the boot state
@@ -111,17 +115,35 @@ class NoiseChannel: MemoryMappedDevice {
         controlRegister = 0x00
     }
     
+    func disableChannel() {
+        // TODO: This
+        
+        enabled = false
+    }
+    
     func isEnabled() -> Bool {
         return enabled
     }
-    
-    // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
         // TODO: This
     }
     
-    func tickNoise() -> VolumeLevel {
+    func tickAPU() {
+        // TODO: This
+    }
+    
+    func tickLengthCounter() {
+        lengthCounter.tickLengthCounter()
+    }
+    
+    func tickVolumeEnvelope() {
+        // TODO: This
+    }
+
+    // MARK: - Private functions
+    
+    private func tickNoise() -> VolumeLevel {
         let bitZero = lfsr & 0x0001
         let bitOne = (lfsr & 0x0002) >> 1
         let equals = bitZero == bitOne  // XNOR operation
@@ -147,7 +169,7 @@ class NoiseChannel: MemoryMappedDevice {
     
     // MARK: - Channel specific functions
     
-    func trigger() {
+    private func trigger() {
         guard dacEnabled else {
             return
         }
@@ -156,14 +178,14 @@ class NoiseChannel: MemoryMappedDevice {
         
         lfsr = 0xFFFF
         
+        // Tell the timer we were triggered
+        
+        lengthCounter.trigger()
+        
         // TODO: Fill this in
     }
     
-    func disableChannelFour() {
-        
-    }
-    
-    func enableDAC() {
+    private func enableDAC() {
         guard !dacEnabled else {
             return
         }
@@ -171,12 +193,12 @@ class NoiseChannel: MemoryMappedDevice {
         dacEnabled = true
     }
     
-    func disableDAC() {
+    private func disableDAC() {
         guard dacEnabled else {
             return
         }
         
-        disableChannelFour()
+        disableChannel()
         dacEnabled = false
     }
     

@@ -56,10 +56,14 @@ private let SEVENTY_FIVE_DUTY_CYCLE: [VolumeLevel] = [0x0F, 0x00, 0x00, 0x00, 0x
 class APU: MemoryMappedDevice {
     // MARK: - Private variables
     
+    private var divAPUCycles: Register = 0
+    
     private var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: true)
     private var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: false)
     private var channelThree: WaveChannel = WaveChannel()
     private var channelFour: NoiseChannel = NoiseChannel()
+    
+    private let channels: [AudioChannel]
     
     private var apuEnabled: Bool = false
     
@@ -114,19 +118,24 @@ class APU: MemoryMappedDevice {
         }
     }
     
+    // MARK: - Constructor
+    
+    init() {
+        channels = [channelOne, channelTwo, channelThree, channelFour]
+    }
+    
     // MARK: - Public functions
     
     func reset() {
         // Set things to the boot state
         
-        channelOne.reset()
-        channelTwo.reset()
-        channelThree.reset()
-        channelFour.reset()
+        channels.forEach { c in c.reset() }
+        
+        divAPUCycles = 0
         
         audioControlRegister = 0x77
         soundPanningRegister = 0xF3
-        masterVolumeRegister = 0xF1
+        masterVolumeRegister = 0xF1        
     }
     
     func enableAPU() {
@@ -148,14 +157,12 @@ class APU: MemoryMappedDevice {
         
         // Clear all registers but the master control register
         
-        channelOne.disableAPU()
-        channelTwo.disableAPU()
-        channelThree.disableAPU()
-        channelFour.disableAPU()
+        channels.forEach { c in c.disableAPU() }
         
         // Note: We CAN NOT write to audioControlRegister, that will cause infinite recursion
         
         apuEnabled = false              // The only thing in audioControlRegister
+        divAPUCycles = 0
         
         soundPanningRegister = 0x00
         masterVolumeRegister = 0x00
@@ -164,7 +171,52 @@ class APU: MemoryMappedDevice {
     // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
+        // TODO: This? Or does divTick do everything we need?
+        
+        channels.forEach { c in c.tick(ticks) }
+    }
+    
+    func divTick() {
+        // We have to do a couple of tasks at different frequencies based on div ticks
+        // First let the channels do whatever they want
+        
+        channels.forEach { c in c.tickAPU() }
+        
+        // Length counts happen on even cycles
+        
+        if divAPUCycles % 2 == 0 {
+            tickLengthCounters()
+        }
+        
+        // On cycle 2 and 6 (when the divAPUCycles counter ends in 0b10) we do the sweep function
+        
+        if divAPUCycles == 2 || divAPUCycles == 6 {
+            tickSweep()
+        }
+        
+        // On cycle 7 we do the volume envelopes
+        
+        if divAPUCycles == 7 {
+            tickVolumeEnvelope()
+        }
+        
+        // Increase the counter but prevent it from hitting 8 or more
+        
+        divAPUCycles = (divAPUCycles + 1) % 8
+    }
+    
+    // MARK: - Private functions
+    
+    private func tickLengthCounters() {
+        channels.forEach { c in c.tickLengthCounter() }
+    }
+    
+    private func tickSweep() {
+        channelOne.tickSweep()
+    }
+    
+    private func tickVolumeEnvelope() {
+        channels.forEach { c in c.tickVolumeEnvelope() }
     }
     
     // MARK: - MemoryMappedDevice protocol functions

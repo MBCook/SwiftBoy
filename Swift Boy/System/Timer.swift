@@ -16,11 +16,12 @@ enum TimerControlBits {
 }
 
 class Timer: MemoryMappedDevice {
-    
     // MARK: - Our private data
     
     private var lastDivRegisterIncrement: UInt16 = 0        // The last time the DIV register was incremented
     private var lastTimerRegisterIncrement: UInt16 = 0      // The last time the counter was incremented
+    
+    private var apu: APU
     
     private let TICKS_PER_DIV: UInt16 = 256
     private let CLOCK_DIVISOR_MASK: UInt8 = 0x03
@@ -39,7 +40,11 @@ class Timer: MemoryMappedDevice {
     
     // MARK: - Public interface
     
-    init() {
+    init(apu: APU) {
+        // Store a reference to the APU
+        
+        self.apu = apu
+        
         // Initialize things to their startup value
         
         reset()
@@ -62,11 +67,22 @@ class Timer: MemoryMappedDevice {
         lastDivRegisterIncrement = lastDivRegisterIncrement + UInt16(ticks)
         
         if lastDivRegisterIncrement >= TICKS_PER_DIV {
-            // We need to increment the div register
+            let oldDiv = divRegister            // Save the old value
+            let newDiv = divRegister &+ 1       // Wrap the value around if it overflows
             
-            divRegister &+= 1       // Register needs to be able to wrap around
+            // Increment the div register
             
-            lastDivRegisterIncrement -= TICKS_PER_DIV   // Don't forget any extra if the last instruction took too long
+            divRegister = newDiv
+            
+            // If bit 4 went from a 1 to a 0, tick the APU
+            
+            if (oldDiv & 0x10 == 0x10) && (newDiv & 0x10 == 0) {
+                apu.divTick()
+            }
+            
+            // Don't forget any extra if the last instruction took too long
+            
+            lastDivRegisterIncrement -= TICKS_PER_DIV
         }
         
         // Do we need to update the timer? Only if the time enable bit is on
@@ -145,23 +161,28 @@ class Timer: MemoryMappedDevice {
     
     func writeRegister(_ address: Address, _ value: UInt8) {
         switch address {
-        case DIV_REGISTER:
-            divRegister = 0                 // All writes to this register reset it to 0
-            lastDivRegisterIncrement = 0    // Gotta reset this too so the first tick isn't too short
-        case TIMER_COUNTER_REGISTER:
-            timerCounter = value
-        case TIME_MODULO_REGISTER:
-            timerModulo = value
-        case TIMER_CONTROL_REGISTER:
-            if timerControl & CLOCK_DIVISOR_MASK != value & CLOCK_DIVISOR_MASK {
-                // They changed the timer rate, reset the internal counter and timer counter
-
-                lastTimerRegisterIncrement = 0
-                timerCounter = timerModulo
-            }
-            timerControl = value
-        default:
-            fatalError("The timer should not have been asked to set memory address 0x\(toHex(address))")
+            case DIV_REGISTER:
+                if divRegister & 0x10 == 0x10 {
+                    // If the div register's bit 4 changed from 1 to 0, we need to tick the APU's clock
+                    apu.divTick()
+                }
+                
+                divRegister = 0                 // All writes to this register reset it to 0
+                lastDivRegisterIncrement = 0    // Gotta reset this too so the first tick isn't too short
+            case TIMER_COUNTER_REGISTER:
+                timerCounter = value
+            case TIME_MODULO_REGISTER:
+                timerModulo = value
+            case TIMER_CONTROL_REGISTER:
+                if timerControl & CLOCK_DIVISOR_MASK != value & CLOCK_DIVISOR_MASK {
+                    // They changed the timer rate, reset the internal counter and timer counter
+                    
+                    lastTimerRegisterIncrement = 0
+                    timerCounter = timerModulo
+                }
+                timerControl = value
+            default:
+                fatalError("The timer should not have been asked to set memory address 0x\(toHex(address))")
         }
     }
 }
