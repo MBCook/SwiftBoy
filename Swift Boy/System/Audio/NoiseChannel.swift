@@ -178,6 +178,10 @@ class NoiseChannel: AudioChannel {
         
         lfsr = 0xFFFF
         
+        // Enable the channel
+        
+        enabled = true
+        
         // Tell the timer we were triggered
         
         lengthCounter.trigger()

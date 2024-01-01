@@ -199,9 +199,9 @@ class SwiftBoy: ObservableObject {
             
             frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameIntervalSeconds
             
-            if frameCounter % 60 == 0 {
-                printFrameStats()
-            }
+//            if frameCounter % 60 == 0 {
+//                printFrameStats()
+//            }
         }
     }
     

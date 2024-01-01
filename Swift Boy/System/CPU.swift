@@ -198,8 +198,21 @@ class CPU {
 //        }
 //
         // Run the operation, updating the program counter and the number of ticks that were used
-        
-//        print(generateDebugLogLine())
+//        
+//        if pc <= 0xC795 && pc >= 0xC78C {
+//            // A timing loop
+//        } else if pc == 0xC02C || pc == 0xC02D {
+//            // Loop watching for a status change
+//        } else if pc == 0xC78C || pc == 0xC78D {
+//            // A different timing loop
+//        } else {            
+//            print(generateDebugLogLine())
+//        }
+//        
+        if pc == 0xC92E {
+            print("-- We've failed --")
+//            abort()
+        }
         
         let lastPC = pc
         
@@ -239,7 +252,7 @@ class CPU {
         return "PC:\(toHex(pc))    " +
                 zero + sub + half + carry + "    " +
                 instruction + padToTwelve + "\t" +
-                "A:\(toHex(a)) F:\(toHex(flags)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
+                "A:\(toHex(a)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
                 "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp))    " +
                 "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))"
     }

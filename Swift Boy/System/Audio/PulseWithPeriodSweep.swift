@@ -56,6 +56,7 @@ class PulseWithPeriodSweep: AudioChannel {
     init(enableSweep: Bool) {
         self.lengthCounter = AudioLengthCounter(0x3F)                        // Max value is 63
         self.lengthCounter.disableChannel = { self.disableChannel() }
+        self.lengthCounter.channelNumber = enableSweep ? 1 : 2
         
         self.enableSweep = enableSweep
     }
@@ -85,6 +86,13 @@ class PulseWithPeriodSweep: AudioChannel {
         }
         set (value) {
             dutyCycle = value >> 6
+            
+            if enableSweep {
+                print("\tChannel 1 initial length being set to", value & 0x3F)
+            } else {
+                print("\tChannel 2 initial length being set to", value & 0x3F)
+            }
+            
             lengthCounter.initalLength = value & 0x3F
         }
     }
@@ -126,6 +134,14 @@ class PulseWithPeriodSweep: AudioChannel {
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
+            if value & 0x40 == 0x40 {
+                if enableSweep {
+                    print("\tChannel 1 length counter being enabled")
+                } else {
+                    print("\tChannel 2 length counter being enabled")
+                }
+            }
+            
             lengthCounter.enabled = value & 0x40 == 0x40
             period = period & 0x00FF + (UInt16(value) & 0x07) << 8      // Take the bottom 3 bits, put them in place on Period
             
@@ -180,7 +196,23 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func disableChannel() {
+        guard enabled else {
+            if enableSweep {
+                print("\tChannel 1 was already disabled, ignoring")
+            } else {
+                print("\tChannel 2 was already disabled, ignoring")
+            }
+            
+            return
+        }
+        
         // TODO: This
+        
+        if enableSweep {
+            print("\tChannel 1 being disabled")
+        } else {
+            print("\tChannel 2 being disabled")
+        }
         
         enabled = false
     }
@@ -198,6 +230,10 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func tickLengthCounter() {
+        guard enabled else {
+            return
+        }
+        
         lengthCounter.tickLengthCounter()
     }
     
@@ -216,6 +252,12 @@ class PulseWithPeriodSweep: AudioChannel {
     private func trigger() {
         guard dacEnabled else {
             return
+        }
+        
+        if enableSweep {
+            print("\tChannel 1 triggered")
+        } else {
+            print("\tChannel 2 triggered")
         }
         
         // Track if we've been triggered at least once
@@ -251,12 +293,24 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
+        if enableSweep {
+            print("\tChannel 1 DAC enabled")
+        } else {
+            print("\tChannel 2 DAC enabled")
+        }
+        
         dacEnabled = true
     }
     
     private func disableDAC() {
         guard dacEnabled else {
             return
+        }
+        
+        if enableSweep {
+            print("\tChannel 1 DAC disabled")
+        } else {
+            print("\tChannel 2 DAC disabled")
         }
         
         // Disabling the DAC also disables the channel

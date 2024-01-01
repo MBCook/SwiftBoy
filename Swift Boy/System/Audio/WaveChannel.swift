@@ -171,6 +171,10 @@ class WaveChannel: AudioChannel {
         
         wavePatternNibble = 0
         
+        // Enable the channel
+        
+        enabled = true
+        
         // Tell the timer we were triggered
         
         lengthCounter.trigger()

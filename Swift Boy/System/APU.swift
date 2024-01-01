@@ -75,11 +75,25 @@ class APU: MemoryMappedDevice {
     private var vinLeft: Bool = false
     private var vinRight: Bool = false
     
+    private var lastAPUStatus: Register?
+    
     // MARK: - Registers
     
     private var audioControlRegister: Register {
         get {
             // Construct the return from if audio is enabled plus bits created from the channel control registers
+            
+            let x: Register = (apuEnabled ? 0x80 : 0x00)
+            + 0x70      // All unused bits are returned as 1s
+            + (channelFour.isEnabled() ? 0x08 : 0x00)
+            + (channelThree.isEnabled() ? 0x04 : 0x00)
+            + (channelTwo.isEnabled() ? 0x02 : 0x00)
+            + (channelOne.isEnabled() ? 0x01 : 0x00)
+            
+            if lastAPUStatus == nil || x != lastAPUStatus {
+                print("APU status is now 0x" + toHex(x));
+                lastAPUStatus = x
+            }
             
             return (apuEnabled ? 0x80 : 0x00)
                     + 0x70      // All unused bits are returned as 1s
@@ -145,6 +159,8 @@ class APU: MemoryMappedDevice {
         
         apuEnabled = true
         
+        print("APU now enabled")
+        
         // TODO: Other stuff?
     }
     
@@ -152,6 +168,8 @@ class APU: MemoryMappedDevice {
         guard apuEnabled else {
             return
         }
+        
+        print("APU now disabled")
         
         // TODO: Clear stuff when this is turned off, see PAN docs
         
