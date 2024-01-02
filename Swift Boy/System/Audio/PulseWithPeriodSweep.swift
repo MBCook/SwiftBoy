@@ -56,7 +56,6 @@ class PulseWithPeriodSweep: AudioChannel {
     init(enableSweep: Bool) {
         self.lengthCounter = AudioLengthCounter(64)
         self.lengthCounter.disableChannel = { self.disableChannel() }
-        self.lengthCounter.channelNumber = enableSweep ? 1 : 2
         
         self.enableSweep = enableSweep
     }
@@ -86,13 +85,6 @@ class PulseWithPeriodSweep: AudioChannel {
         }
         set (value) {
             dutyCycle = value >> 6
-            
-            if enableSweep {
-                print("\tChannel 1 initial length being set to", value & 0x3F)
-            } else {
-                print("\tChannel 2 initial length being set to", value & 0x3F)
-            }
-            
             lengthCounter.initalLength = value & 0x3F
         }
     }
@@ -134,14 +126,6 @@ class PulseWithPeriodSweep: AudioChannel {
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
-            if value & 0x40 == 0x40 {
-                if enableSweep {
-                    print("\tChannel 1 length counter being enabled")
-                } else {
-                    print("\tChannel 2 length counter being enabled")
-                }
-            }
-            
             lengthCounter.enabled = value & 0x40 == 0x40
             period = period & 0x00FF + (UInt16(value) & 0x07) << 8      // Take the bottom 3 bits, put them in place on Period
             

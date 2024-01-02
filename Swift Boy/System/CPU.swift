@@ -56,8 +56,6 @@ class CPU {
     
     // MARK: - Combo registers, which require computed properties
     
-    private var delayOver: Bool = true
-    
     private var af: RegisterPair {
         get {
             return UInt16(a) << 8 + UInt16(flags)
@@ -193,55 +191,39 @@ class CPU {
             op = memory[pc]
         }
         
-//        if op != 0xCB {
-//            print("\(toHex(pc)): \(toHex(op))")
-//        } else {
-//            print("\(toHex(pc)): \(toHex(op)) \(toHex(memory[pc + 1]))")
-//        }
-//
         // Run the operation, updating the program counter and the number of ticks that were used
-//        
-        if pc >= 0xC79C && pc <= 0xC795 {
-            // A timing loop
-        } else if pc == 0xC02C || pc == 0xC02D {
-            // Loop watching for a status change
-        } else if pc == 0xC221 {
-            print("NR52 is 0x" + toHex(a) + ", chan_mask is 0x" + toHex(memory[0xFF86])
-                  + ", ANDed that's 0x" + toHex(a & memory[0xFF86]) + ", need 0x00")
-        } else if pc == 0xC92E {
-            print("-- We've failed --")
-            exit(EXIT_FAILURE)
-        } else if pc == 0xC032 {
-            print("at *sync_apu*")
-        } else if pc == 0xC07C {
-            print("done with *sync_apu*")
-        } else if pc == 0xC1DB {
-            print("at *begin*")
-        } else if pc == 0xC203 {
-            print("at *should_be_on*")
-        } else if pc == 0xC20D {
-            print("at *should_be_almost_off*")
-        } else if pc == 0xC21C {
-            print("at *should_be_off*")
-        } else if pc == 0xC226 {
-            print("at *test_chan*")
-        } else if pc == 0xC202 {
-            print("done with *begin*")
-        } else if pc == 0xC20C {
-            print("done with *should_be_on*")
-        } else if pc == 0xC225 {
-            print("done with *should_be_off*")
-        } else if pc == 0xC997 {
-            print("at *test_all_chans*")
-        } else if pc == 0xC79B && delayOver {
-//            print("at *delay*")
-            delayOver = false
-        } else if pc == 0xC7A5 {
-//            print("done with *delay*")
-            delayOver = true
-        } else {
-//            print(generateDebugLogLine())
-        }
+
+//        if pc == 0xC221 {
+//            print("NR52 is 0x" + toHex(a) + ", chan_mask is 0x" + toHex(memory[0xFF86])
+//                  + ", ANDed that's 0x" + toHex(a & memory[0xFF86]) + ", need 0x00")
+//        } else if pc == 0xC92E {
+//            print("-- We've failed --")
+//            exit(EXIT_FAILURE)
+//        } else if pc == 0xC032 {
+//            print("at *sync_apu*")
+//        } else if pc == 0xC07C {
+//            print("done with *sync_apu*")
+//        } else if pc == 0xC1DB {
+//            print("at *begin*")
+//        } else if pc == 0xC203 {
+//            print("at *should_be_on*")
+//        } else if pc == 0xC20D {
+//            print("at *should_be_almost_off*")
+//        } else if pc == 0xC21C {
+//            print("at *should_be_off*")
+//        } else if pc == 0xC226 {
+//            print("at *test_chan*")
+//        } else if pc == 0xC202 {
+//            print("done with *begin*")
+//        } else if pc == 0xC20C {
+//            print("done with *should_be_on*")
+//        } else if pc == 0xC225 {
+//            print("done with *should_be_off*")
+//        } else if pc == 0xC997 {
+//            print("at *test_all_chans*")
+//        } else {
+//           print(generateDebugLogLine())
+//        }
 
         let lastPC = pc
         

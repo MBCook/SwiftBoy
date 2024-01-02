@@ -91,7 +91,6 @@ class APU: MemoryMappedDevice {
             + (channelOne.isEnabled() ? 0x01 : 0x00)
             
             if lastAPUStatus == nil || x != lastAPUStatus {
-                print("APU status is now 0x" + toHex(x));
                 lastAPUStatus = x
             }
             

@@ -146,9 +146,6 @@ class Memory {
                 case .workRAM:
                     return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
                 case .highRAM:
-//                    if index == 0xFF86 {
-//                        print("Reading chan_mask returns 0x" + toHex(highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]))
-//                    }                    
                     return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
                 case .interruptController:
                     return interruptController.readRegister(index)
@@ -197,9 +194,6 @@ class Memory {
                 case .audio:
                     apu.writeRegister(index, value)
                 case .highRAM:
-                    if index == 0xFF86 {
-                        print("Writing", toHex(value), "to chan_mask")
-                    }
                     highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
                 case .interruptController:
                     interruptController.writeRegister(index, value)

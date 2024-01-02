@@ -26,8 +26,6 @@ class AudioLengthCounter {
     var enabled: Bool = false
     var disableChannel: (() -> Void)? = nil
     
-    var channelNumber: Int = 0
-    
     // MARK: - Private variables
     
     private var counter: RegisterPair = 0       // Needs to be big enough to hold 256
@@ -50,38 +48,28 @@ class AudioLengthCounter {
         
         if counter > 0 {
             counter -= 1
-            
-            print("Channel", channelNumber, "now at", counter)
         }
         
         // If we're at zero now, we need to trigger our channel to be disabled through the callback
         
         if counter == 0 {
-            print("\t\tChannel", channelNumber, "length counter has hit 0, calling disable()")
             disableChannel!()
         }
     }
     
     func enableTimer() {
-        print("\t\tChannel", channelNumber, " length counter being enabled")
         enabled = true
     }
     
     func disableTimer() {
-        print("\t\tChannel", channelNumber, " length counter being disabled")
         enabled = false
     }
     
     func trigger() {
-        guard enabled else {
-            print("\t\tChannel", channelNumber, " was not enabled, ignoring trigger")
-            return
-        }
-        
-        // If the length counter is 0, reset it to the max
-        
         if counter == 0 {
-            print("\t\tChannel", channelNumber, "triggered with counter at 0, resetting to ", maxTimerValue)
+            // If the length counter is 0, reset it to the max
+            // We do this even if the length counter is disabled when the trigger happens
+        
             counter = maxTimerValue
         }
     }
