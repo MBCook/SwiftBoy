@@ -211,6 +211,10 @@ class CPU {
         } else if pc == 0xC92E {
             print("-- We've failed --")
             exit(EXIT_FAILURE)
+        } else if pc == 0xC032 {
+            print("at *sync_apu*")
+        } else if pc == 0xC07C {
+            print("done with *sync_apu*")
         } else if pc == 0xC1DB {
             print("at *begin*")
         } else if pc == 0xC203 {
@@ -227,6 +231,8 @@ class CPU {
             print("done with *should_be_on*")
         } else if pc == 0xC225 {
             print("done with *should_be_off*")
+        } else if pc == 0xC997 {
+            print("at *test_all_chans*")
         } else if pc == 0xC79B && delayOver {
 //            print("at *delay*")
             delayOver = false
