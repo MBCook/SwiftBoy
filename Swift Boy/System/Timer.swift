@@ -23,7 +23,7 @@ class Timer: MemoryMappedDevice {
     
     private var apu: APU
     
-    private let TICKS_PER_DIV: UInt16 = 256
+    private let TICKS_PER_DIV: UInt16 = 64
     private let CLOCK_DIVISOR_MASK: UInt8 = 0x03
     
     private let DIV_REGISTER: Address = 0xFF04
