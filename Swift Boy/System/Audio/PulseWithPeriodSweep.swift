@@ -230,10 +230,6 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func tickLengthCounter() {
-        guard enabled else {
-            return
-        }
-        
         lengthCounter.tickLengthCounter()
     }
     
