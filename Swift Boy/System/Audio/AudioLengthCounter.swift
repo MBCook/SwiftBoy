@@ -15,12 +15,11 @@ class AudioLengthCounter {
             abort()         // No one should ever read this
         }
         set (value) {
-            if value == 0 {
-                // Setting it to 0 actually sets the maximum
-                counter = maxTimerValue
-            } else {
-                counter = value
-            }
+            // Setting it to X (say 15) sets the timer to maxValue - X
+            // So for a max of 64 and set to 60, counter = 4 and will hit zero in 4 length counter ticks
+            // This also has the effect where setting it 0 sets it to the max, which matches the hardware
+            
+            counter = maxTimerValue - UInt16(value)
         }
     }
     
@@ -31,12 +30,12 @@ class AudioLengthCounter {
     
     // MARK: - Private variables
     
-    private var counter: Register = 0
-    private let maxTimerValue: Register
+    private var counter: RegisterPair = 0       // Needs to be big enough to hold 256
+    private let maxTimerValue: RegisterPair     // Same
     
     // MARK: - Public methods
     
-    init(_ maxTimerValue: Register) {
+    init(_ maxTimerValue: RegisterPair) {
         self.maxTimerValue = maxTimerValue
     }
     
@@ -52,7 +51,7 @@ class AudioLengthCounter {
         if counter > 0 {
             counter -= 1
             
-//            print("Channel", channelNumber, "now at", counter)
+            print("Channel", channelNumber, "now at", counter)
         }
         
         // If we're at zero now, we need to trigger our channel to be disabled through the callback

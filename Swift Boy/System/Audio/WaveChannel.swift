@@ -103,7 +103,7 @@ class WaveChannel: AudioChannel {
     // MARK: - Constructor
     
     init() {
-        self.lengthCounter = AudioLengthCounter(0xFF)                        // Max value is 255
+        self.lengthCounter = AudioLengthCounter(256)
         self.lengthCounter.disableChannel = { self.disableChannel() }
     }
     

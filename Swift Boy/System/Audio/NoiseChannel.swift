@@ -93,7 +93,7 @@ class NoiseChannel: AudioChannel {
     // MARK: - Constructor
     
     init() {
-        self.lengthCounter = AudioLengthCounter(0x3F)                        // Max value is 63
+        self.lengthCounter = AudioLengthCounter(64)
         self.lengthCounter.disableChannel = { self.disableChannel() }
     }
     

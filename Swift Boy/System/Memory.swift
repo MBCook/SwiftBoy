@@ -119,38 +119,41 @@ class Memory {
             // Categorize the read
             
             let section = categorizeAddress(index)
-
+            
             // During DMA you can only access high RAM
             
             guard !ppu.dmaInProgress() || section == .highRAM else {
                 return 0xFF     // Open bus, you wouldn't have been able to read anything at that address
             }
-
+            
             // Route it to the right place (order doesn't matter, the classifier took care of that)
             
             switch section {
-            case .rom:
-                return cartridge.readFromROM(index)
-            case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
-                return ppu.readRegister(index)
-            case .timerRegisters:
-                return timer.readRegister(index)
-            case .ioRegisters:
-                return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
-            case .joypad:
-                return joypad.readRegister(index)
-            case .audio:
-                return apu.readRegister(index)
-            case .externalRAM:
-                return cartridge.readFromRAM(index)
-            case .workRAM:
-                return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
-            case .highRAM:
-                return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
-            case .interruptController:
-                return interruptController.readRegister(index)
-            case .unknown:
-                return 0xFF // Reading anywhere else gets you an open bus (0xFF)
+                case .rom:
+                    return cartridge.readFromROM(index)
+                case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
+                    return ppu.readRegister(index)
+                case .timerRegisters:
+                    return timer.readRegister(index)
+                case .ioRegisters:
+                    return ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)]
+                case .joypad:
+                    return joypad.readRegister(index)
+                case .audio:
+                    return apu.readRegister(index)
+                case .externalRAM:
+                    return cartridge.readFromRAM(index)
+                case .workRAM:
+                    return workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)]
+                case .highRAM:
+//                    if index == 0xFF86 {
+//                        print("Reading chan_mask returns 0x" + toHex(highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]))
+//                    }                    
+                    return highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)]
+                case .interruptController:
+                    return interruptController.readRegister(index)
+                case .unknown:
+                    return 0xFF // Reading anywhere else gets you an open bus (0xFF)
             }
         }
         set(value) {
@@ -177,29 +180,32 @@ class Memory {
             // Route it to the right place (order doesn't matter, the classifier took care of that)
             
             switch section {
-            case .rom:
-                cartridge.writeToROM(index, value)
-            case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
-                ppu.writeRegister(index, value)
-            case .externalRAM:
-                cartridge.writeToRAM(index, value)
-            case .workRAM:
-                workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
-            case .timerRegisters:
-                timer.writeRegister(index, value)
-            case .ioRegisters:
-                ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
-            case .joypad:
-                joypad.writeRegister(index, value)
-            case .audio:
-                apu.writeRegister(index, value)
-            case .highRAM:
-                highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
-            case .interruptController:
-                interruptController.writeRegister(index, value)
-            case .unknown:
-                // We'll do nothing
-                return
+                case .rom:
+                    cartridge.writeToROM(index, value)
+                case .videoRAM, .objectAttributeMemory, .lcdRegisters, .dmaRegister:
+                    ppu.writeRegister(index, value)
+                case .externalRAM:
+                    cartridge.writeToRAM(index, value)
+                case .workRAM:
+                    workRAM[Int(index - MemoryLocations.workRAMRange.lowerBound)] = value
+                case .timerRegisters:
+                    timer.writeRegister(index, value)
+                case .ioRegisters:
+                    ioRegisters[Int(index - MemoryLocations.ioRegisterRange.lowerBound)] = value
+                case .joypad:
+                    joypad.writeRegister(index, value)
+                case .audio:
+                    apu.writeRegister(index, value)
+                case .highRAM:
+                    if index == 0xFF86 {
+                        print("Writing", toHex(value), "to chan_mask")
+                    }
+                    highRAM[Int(index - MemoryLocations.highRAMRange.lowerBound)] = value
+                case .interruptController:
+                    interruptController.writeRegister(index, value)
+                case .unknown:
+                    // We'll do nothing
+                    return
             }
         }
     }
@@ -210,35 +216,35 @@ class Memory {
         // Note that overall ranges (like I/O registers) must come AFTER more specific entries (like joystick or video registers)
         
         switch address {
-        
-        case MemoryLocations.timerRegistersRange:
-            return .timerRegisters
-        case MemoryLocations.joypad:
-            return .joypad
-        case MemoryLocations.dmaRegister:
-            return .dmaRegister
-        case MemoryLocations.lcdRegisterRange:
-            return .lcdRegisters
-        case MemoryLocations.audioRange:
-            return .audio
-        case MemoryLocations.interruptEnable, MemoryLocations.interruptFlags:
-            return .interruptController
-        case MemoryLocations.ioRegisterRange:
-            return .ioRegisters
-        case MemoryLocations.romRange:
-            return .rom
-        case MemoryLocations.videoRAMRange:
-            return .videoRAM
-        case MemoryLocations.externalRAMRange:
-            return .externalRAM
-        case MemoryLocations.workRAMRange:
-            return .workRAM
-        case MemoryLocations.objectAttributeMemoryRange:
-            return .objectAttributeMemory
-        case MemoryLocations.highRAMRange:
-            return .highRAM
-        default:
-            return .unknown
+                
+            case MemoryLocations.timerRegistersRange:
+                return .timerRegisters
+            case MemoryLocations.joypad:
+                return .joypad
+            case MemoryLocations.dmaRegister:
+                return .dmaRegister
+            case MemoryLocations.lcdRegisterRange:
+                return .lcdRegisters
+            case MemoryLocations.audioRange:
+                return .audio
+            case MemoryLocations.interruptEnable, MemoryLocations.interruptFlags:
+                return .interruptController
+            case MemoryLocations.ioRegisterRange:
+                return .ioRegisters
+            case MemoryLocations.romRange:
+                return .rom
+            case MemoryLocations.videoRAMRange:
+                return .videoRAM
+            case MemoryLocations.externalRAMRange:
+                return .externalRAM
+            case MemoryLocations.workRAMRange:
+                return .workRAM
+            case MemoryLocations.objectAttributeMemoryRange:
+                return .objectAttributeMemory
+            case MemoryLocations.highRAMRange:
+                return .highRAM
+            default:
+                return .unknown
         }
     }
 }
