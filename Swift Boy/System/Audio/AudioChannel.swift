@@ -8,6 +8,8 @@
 import Foundation
 
 protocol AudioChannel: MemoryMappedDevice {
+    var apu: APU? { get set }
+    
     func reset()
     func disableAPU()
     func disableChannel()

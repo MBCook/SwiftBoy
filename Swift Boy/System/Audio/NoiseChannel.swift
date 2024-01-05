@@ -30,6 +30,8 @@ class NoiseChannel: AudioChannel {
     private var lowLFSRWidth: Bool = false
     private var lfsr: RegisterPair = 0
     
+    var apu: APU? = nil
+    
     // MARK: - Registers
     
     private var lengthRegister: Register {
@@ -82,9 +84,16 @@ class NoiseChannel: AudioChannel {
                     + 0x3F                      // Bottom bits aren't used either
         }
         set (value) {
-            lengthCounter.enabled = value & 0x40 == 0x40
+            let shouldEnableLengthCounter = value & 0x40 == 0x40
+            let triggering = value & 0x80 == 0x80
             
-            if (value & 0x80) == 0x80 {
+            if apu!.notOnLengthTickCycle() && !lengthCounter.enabled && shouldEnableLengthCounter {
+                lengthCounter.extraDecrementBug(channelTriggered: triggering)
+            }
+            
+            lengthCounter.enabled = shouldEnableLengthCounter
+            
+            if triggering {
                 trigger()
             }
         }

@@ -50,9 +50,31 @@ class AudioLengthCounter {
             counter -= 1
         }
         
-        // If we're at zero now, we need to trigger our channel to be disabled through the callback
+        // If we're at zero now, we need to disabled the channel through the callback
         
         if counter == 0 {
+            disableChannel!()
+        }
+    }
+    
+    func extraDecrementBug(channelTriggered: Bool) {
+        guard counter != 0 else {
+            // If the length counter was 0 we don't do this=
+            return
+        }
+        
+        // Decrement the timer but don't let it go below 0
+        
+        if counter > 0 {
+            counter -= 1
+        }
+        
+        // If we're at zero now, we need to disabled the channel through the callback
+        // UNLESS the channel was triggered in the same write to the register,
+        // in which case we dont' disable the channel. If it was triggered we leave it at 0,
+        // the trigger code will fix it for us.
+        
+        if !channelTriggered && counter == 0{
             disableChannel!()
         }
     }

@@ -193,37 +193,7 @@ class CPU {
         
         // Run the operation, updating the program counter and the number of ticks that were used
 
-//        if pc == 0xC221 {
-//            print("NR52 is 0x" + toHex(a) + ", chan_mask is 0x" + toHex(memory[0xFF86])
-//                  + ", ANDed that's 0x" + toHex(a & memory[0xFF86]) + ", need 0x00")
-//        } else if pc == 0xC92E {
-//            print("-- We've failed --")
-//            exit(EXIT_FAILURE)
-//        } else if pc == 0xC032 {
-//            print("at *sync_apu*")
-//        } else if pc == 0xC07C {
-//            print("done with *sync_apu*")
-//        } else if pc == 0xC1DB {
-//            print("at *begin*")
-//        } else if pc == 0xC203 {
-//            print("at *should_be_on*")
-//        } else if pc == 0xC20D {
-//            print("at *should_be_almost_off*")
-//        } else if pc == 0xC21C {
-//            print("at *should_be_off*")
-//        } else if pc == 0xC226 {
-//            print("at *test_chan*")
-//        } else if pc == 0xC202 {
-//            print("done with *begin*")
-//        } else if pc == 0xC20C {
-//            print("done with *should_be_on*")
-//        } else if pc == 0xC225 {
-//            print("done with *should_be_off*")
-//        } else if pc == 0xC997 {
-//            print("at *test_all_chans*")
-//        } else {
-//           print(generateDebugLogLine())
-//        }
+//        print(generateDebugLogLine())
 
         let lastPC = pc
         

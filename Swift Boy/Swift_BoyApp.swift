@@ -36,16 +36,18 @@ struct Swift_BoyApp: App {
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Super Mario Land.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
+
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
-//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/mem_timing.gb")
-//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/01-read_timing.gb")
-//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/02-write_timing.gb")
-//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/03-modify_timing.gb")
-//?        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/oam_bug/oam_bug.gb")
-
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/01-registers.gb")
-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/02-len ctr.gb")
+//+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/02-len ctr.gb")
+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/03-trigger.gb")
+        
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/mem_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/01-read_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/02-write_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/mem_timing/individual/03-modify_timing.gb")
+//-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/oam_bug/oam_bug.gb")
         
         do {
             // Create stuff

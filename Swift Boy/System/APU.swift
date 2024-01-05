@@ -56,7 +56,7 @@ private let SEVENTY_FIVE_DUTY_CYCLE: [VolumeLevel] = [0x0F, 0x00, 0x00, 0x00, 0x
 class APU: MemoryMappedDevice {
     // MARK: - Private variables
     
-    private var divAPUCycles: Register = 0
+    private var frameSequencer: Register = 0
     
     private var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: true)
     private var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: false)
@@ -84,11 +84,11 @@ class APU: MemoryMappedDevice {
             // Construct the return from if audio is enabled plus bits created from the channel control registers
             
             let x: Register = (apuEnabled ? 0x80 : 0x00)
-            + 0x70      // All unused bits are returned as 1s
-            + (channelFour.isEnabled() ? 0x08 : 0x00)
-            + (channelThree.isEnabled() ? 0x04 : 0x00)
-            + (channelTwo.isEnabled() ? 0x02 : 0x00)
-            + (channelOne.isEnabled() ? 0x01 : 0x00)
+                                + 0x70      // All unused bits are returned as 1s
+                                + (channelFour.isEnabled() ? 0x08 : 0x00)
+                                + (channelThree.isEnabled() ? 0x04 : 0x00)
+                                + (channelTwo.isEnabled() ? 0x02 : 0x00)
+                                + (channelOne.isEnabled() ? 0x01 : 0x00)
             
             if lastAPUStatus == nil || x != lastAPUStatus {
                 lastAPUStatus = x
@@ -135,6 +135,11 @@ class APU: MemoryMappedDevice {
     
     init() {
         channels = [channelOne, channelTwo, channelThree, channelFour]
+        
+        channelOne.apu = self
+        channelTwo.apu = self
+        channelThree.apu = self
+        channelFour.apu = self
     }
     
     // MARK: - Public functions
@@ -144,7 +149,7 @@ class APU: MemoryMappedDevice {
         
         channels.forEach { c in c.reset() }
         
-        divAPUCycles = 0
+        frameSequencer = 0
         
         audioControlRegister = 0x77
         soundPanningRegister = 0xF3
@@ -179,10 +184,21 @@ class APU: MemoryMappedDevice {
         // Note: We CAN NOT write to audioControlRegister, that will cause infinite recursion
         
         apuEnabled = false              // The only thing in audioControlRegister
-        divAPUCycles = 0
+        frameSequencer = 0
         
         soundPanningRegister = 0x00
         masterVolumeRegister = 0x00
+    }
+    
+    func notOnLengthTickCycle() -> Bool {
+        /*
+         * There is a fun little quirk of the GB where if a channel's length counter is enabled when it wasn't
+         * during the time the frame sequencer would not have ticked a length counter clock an update to
+         * the length counter happens even though it's technically wrong. So the audio channels need to know which
+         * stage of things we're in.
+         */
+        
+        return frameSequencer % 2 != 0
     }
     
     // MARK: - Tick functions
@@ -201,25 +217,25 @@ class APU: MemoryMappedDevice {
         
         // Length counts happen on even cycles
         
-        if divAPUCycles % 2 == 0 {
+        if frameSequencer % 2 == 0 {
             tickLengthCounters()
         }
         
-        // On cycle 2 and 6 (when the divAPUCycles counter ends in 0b10) we do the sweep function
+        // On cycle 2 and 6 (when the frameSequencer counter ends in 0b10) we do the sweep function
         
-        if divAPUCycles == 2 || divAPUCycles == 6 {
+        if frameSequencer == 2 || frameSequencer == 6 {
             tickSweep()
         }
         
         // On cycle 7 we do the volume envelopes
         
-        if divAPUCycles == 7 {
+        if frameSequencer == 7 {
             tickVolumeEnvelope()
         }
         
         // Increase the counter but prevent it from hitting 8 or more
         
-        divAPUCycles = (divAPUCycles + 1) % 8
+        frameSequencer = (frameSequencer + 1) % 8
     }
     
     // MARK: - Private functions

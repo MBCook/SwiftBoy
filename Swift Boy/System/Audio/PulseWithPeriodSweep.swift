@@ -51,6 +51,8 @@ class PulseWithPeriodSweep: AudioChannel {
     
     private var enableSweep = false
     
+    var apu: APU? = nil
+    
     // MARK: - Constructor
     
     init(enableSweep: Bool) {
@@ -126,10 +128,17 @@ class PulseWithPeriodSweep: AudioChannel {
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
-            lengthCounter.enabled = value & 0x40 == 0x40
+            let shouldEnableLengthCounter = value & 0x40 == 0x40
+            let triggering = value & 0x80 == 0x80
+            
+            if apu!.notOnLengthTickCycle() && !lengthCounter.enabled && shouldEnableLengthCounter {
+                lengthCounter.extraDecrementBug(channelTriggered: triggering)
+            }
+            
+            lengthCounter.enabled = shouldEnableLengthCounter
             period = period & 0x00FF + (UInt16(value) & 0x07) << 8      // Take the bottom 3 bits, put them in place on Period
             
-            if value & 0x80 == 0x80 {
+            if triggering {
                 trigger()
             }
         }
@@ -181,12 +190,6 @@ class PulseWithPeriodSweep: AudioChannel {
     
     func disableChannel() {
         guard enabled else {
-            if enableSweep {
-                print("\tChannel 1 was already disabled, ignoring")
-            } else {
-                print("\tChannel 2 was already disabled, ignoring")
-            }
-            
             return
         }
         

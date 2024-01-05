@@ -34,6 +34,8 @@ class WaveChannel: AudioChannel {
     private var wavePatternNibble: Register = 0
     private var wavePatternBuffer: Register = 0
     
+    var apu: APU? = nil
+    
     // MARK: - Registers
     
     private var dacEnableRegister: Register {
@@ -85,14 +87,17 @@ class WaveChannel: AudioChannel {
                     + 0x3F                      // Next 3 aren't used, last 3 are read-only so return 1
         }
         set (value) {
-            lengthCounter.enabled = value & 0x40 == 0x40
+            let shouldEnableLengthCounter = value & 0x40 == 0x40
+            let triggering = value & 0x80 == 0x80
             
-            let lowBits = period & 0x00FF
-            let highBits = (UInt16(value) & 0x07) << 8  // We're setting the top 3 bits, bottom 8 come from existing value
+            if apu!.notOnLengthTickCycle() && !lengthCounter.enabled && shouldEnableLengthCounter {
+                lengthCounter.extraDecrementBug(channelTriggered: triggering)
+            }
             
-            period = highBits + lowBits
+            lengthCounter.enabled = shouldEnableLengthCounter
+            period = period & 0x00FF + (UInt16(value) & 0x07) << 8      // Take the bottom 3 bits, put them in place on Period
             
-            if (value & 0x80) == 0x80 {
+            if triggering {
                 trigger()
             }
         }
