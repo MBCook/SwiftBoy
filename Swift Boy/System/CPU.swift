@@ -197,6 +197,12 @@ class CPU {
 
         let lastPC = pc
         
+        if pc == 0xC8EF {
+            print("\n\n")
+            print("Failure!")
+            print("\n\n")
+        }
+        
         (pc, ticksUsed) = try executeOpcode(op)
         
         // If we're executing under halt bug conditions, ignore the PC and reset it to the halt bug

@@ -87,8 +87,20 @@ class NoiseChannel: AudioChannel {
             let shouldEnableLengthCounter = value & 0x40 == 0x40
             let triggering = value & 0x80 == 0x80
             
-            if apu!.notOnLengthTickCycle() && !lengthCounter.enabled && shouldEnableLengthCounter {
-                lengthCounter.extraDecrementBug(channelTriggered: triggering)
+            if apu!.notOnLengthTickCycle() {
+                // Extra length clocking occurs when you write to this register during this window
+                
+                if !lengthCounter.enabled && shouldEnableLengthCounter && !lengthCounter.equalsZero {
+                    // If the length counter is being enabled and it wasn't before, the counter isn't at 0 do an extra decrement
+                    
+                    lengthCounter.performExtraDecrement(andDisableIfZero: !triggering)  // Don't disable if we're not triggering
+                }
+                
+                // If the channel is triggered and the counter is changed to enabled and length was 0 set length to MAX - 1
+                
+                if (triggering && shouldEnableLengthCounter && lengthCounter.equalsZero) {
+                    lengthCounter.setToMaxAndDecrement()
+                }
             }
             
             lengthCounter.enabled = shouldEnableLengthCounter
