@@ -18,7 +18,7 @@ typealias Ticks = UInt8             // A tick is 1 cycle at 2^20th HZ (~1 MHz), 
 typealias VolumeLevel = UInt8
 
 let GAMEBOY_DOCTOR = false
-let BLARGG_TEST_ROMS = false
+let BLARGG_TEST_ROMS = true
 let CONSOLE_DISPLAY = false
 
 let CORRECT_FRAME_TIME_SECONDS = 1.0 / 60.0     // Aim for 60 frames per second
@@ -71,6 +71,7 @@ class SwiftBoy: ObservableObject {
         
         let dmaController = DMAController()
 
+        apu.reset()
         ppu = PPU(dmaController: dmaController)
         memory = Memory(cartridge: cartridge,
                         timer: timer,
@@ -159,7 +160,7 @@ class SwiftBoy: ObservableObject {
         // Setup the log file if we're in Gameboy Doctor mode
         
         if GAMEBOY_DOCTOR {
-            let path = "/Users/michael/Downloads/gameboy-doctor-master/myrun.txt"
+            let path = "/Users/michael/Documents/ROMs/GB/gameboy-doctor-master/myrun.txt"
             
             do {
                 if FileManager.default.fileExists(atPath: path) {

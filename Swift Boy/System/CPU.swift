@@ -221,7 +221,7 @@ class CPU {
     func generateDebugLogLine() -> String {
         // Write a log line like this:
         //
-        // PC:C664    _S_C    OR A, C         A:FC F:50 B:FC C:ED D:CA E:9B H:C5 L:93 SP:DFEE    PCMEM:B1,28,06,F0
+        // PC: C664    _S_C    OR A, C         A:FC F:50 B:FC C:ED D:CA E:9B H:C5 L:93 SP:DFEE    PCMEM:B1,28,06,F0
         //
         // The stuff after PCMEM are the values at PC+1, PC+2, PC+3, and PC+4 in memory
         
@@ -236,12 +236,57 @@ class CPU {
         let instruction = getOpcode(nextOpcode, afterThat)
         let padToTwelve = String.init(repeating: " ", count: 12 - instruction.count)
         
-        return "PC:\(toHex(pc))    " +
+        return "PC: \(toHex(pc))    " +
                 zero + sub + half + carry + "    " +
                 instruction + padToTwelve + "\t" +
                 "A:\(toHex(a)) B:\(toHex(b)) C:\(toHex(c)) D:\(toHex(d)) " +
                 "E:\(toHex(e)) H:\(toHex(h)) L:\(toHex(l)) SP:\(toHex(sp))    " +
                 "PCMEM:\(toHex(memory[pc])),\(toHex(memory[pc &+ 1])),\(toHex(memory[pc &+ 2])),\(toHex(memory[pc &+ 3]))"
+    }
+    
+    func generateAudioDebugLogLine() -> String {
+        // Write log lines like this:
+        //
+        // Audio:
+        //             x0, x1, x2, x3, x4
+        //     NR10-4: 80, FF, 08, FF, FF
+        //     NR21-4:     FF, 08, FF, FF
+        //     NR30-4: 7F, FF, 9F, FF, BF
+        //     NR40-3:     00, 00, BF
+        //     NR50-2: 77, FF, F0
+        
+        let nr10 = toHex(memory[0xFF10])
+        let nr11 = toHex(memory[0xFF11])
+        let nr12 = toHex(memory[0xFF12])
+        let nr13 = toHex(memory[0xFF13])
+        let nr14 = toHex(memory[0xFF14])
+        
+        let nr21 = toHex(memory[0xFF16])
+        let nr22 = toHex(memory[0xFF17])
+        let nr23 = toHex(memory[0xFF18])
+        let nr24 = toHex(memory[0xFF19])
+        
+        let nr30 = toHex(memory[0xFF1A])
+        let nr31 = toHex(memory[0xFF1B])
+        let nr32 = toHex(memory[0xFF1C])
+        let nr33 = toHex(memory[0xFF1D])
+        let nr34 = toHex(memory[0xFF1E])
+        
+        let nr41 = toHex(memory[0xFF21])
+        let nr42 = toHex(memory[0xFF22])
+        let nr43 = toHex(memory[0xFF23])
+        
+        let nr50 = toHex(memory[0xFF24])
+        let nr51 = toHex(memory[0xFF25])
+        let nr52 = toHex(memory[0xFF26])
+        
+        return "Audio:\n" +
+                "\t        x0, x1, x2, x3, x4\n" +
+                "\tNR10-4: \(nr10), \(nr11), \(nr12), \(nr13), \(nr14)\n" +
+                "\tNR21-4:     \(nr21), \(nr22), \(nr23), \(nr24)\n" +
+                "\tNR30-4: \(nr30), \(nr31), \(nr32), \(nr33), \(nr34)\n" +
+                "\tNR40-3:     \(nr41), \(nr42), \(nr43)\n" +
+                "\tNR50-2: \(nr50), \(nr51), \(nr52)"
     }
     
     // MARK: - Private helper functions

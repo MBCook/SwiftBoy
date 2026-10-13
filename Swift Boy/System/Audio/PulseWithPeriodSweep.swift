@@ -206,6 +206,8 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
+        print("Channel 1 or 2 being disabled")
+        
         // TODO: This
         
         enabled = false
@@ -240,6 +242,12 @@ class PulseWithPeriodSweep: AudioChannel {
     // MARK: - Private functions
     
     private func trigger() {
+        // Tell the timer we were triggered
+        
+        lengthCounter.trigger()
+        
+        // Don't do anything else if we're disabled
+        
         guard dacEnabled else {
             return
         }
@@ -261,9 +269,7 @@ class PulseWithPeriodSweep: AudioChannel {
         
         enabled = true
         
-        // Tell the timer we were triggered
-        
-        lengthCounter.trigger()
+        print("Channel 1 or 2 being enabled")
         
         // Reset the duty step index
         

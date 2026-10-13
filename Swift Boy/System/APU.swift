@@ -58,9 +58,10 @@ class APU: MemoryMappedDevice {
     
     private var frameSequencer: Register = 0
     
-    private var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: true)
-    private var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: false)
-    private var channelThree: WaveChannel = WaveChannel()
+    var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: true)
+    var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: false)
+    var channelThree: WaveChannel = WaveChannel()
+    
     private var channelFour: NoiseChannel = NoiseChannel()
     
     private let channels: [AudioChannel]

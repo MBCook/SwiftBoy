@@ -7,6 +7,8 @@
 
 import Foundation
 
+// This is used for channel 3, the wave channel
+
 private let SC3_DAC_ENABLE: Address = 0xFF1A
 private let SC3_LENGTH: Address = 0xFF1B
 private let SC3_OUTPUT_LEVEL: Address = 0xFF1C
@@ -153,6 +155,12 @@ class WaveChannel: AudioChannel {
     }
     
     func disableChannel() {
+        guard enabled else {
+            return
+        }
+     
+        print("Channel 3 being disabled")
+        
         // TODO: This
         
         enabled = false
@@ -181,9 +189,11 @@ class WaveChannel: AudioChannel {
     // MARK: - Channel specific functions
     
     private func trigger() {
-        guard dacEnabled else {
-            return
-        }
+        // Tell the timer we were triggered
+        
+        lengthCounter.trigger()
+        
+        // Don't do anything else if we're disabled
         
         // Reset where to load the next nibble from but DON'T clear the buffer
         
@@ -191,11 +201,9 @@ class WaveChannel: AudioChannel {
         
         // Enable the channel
         
+        print("Channel 3 being enabled")
+        
         enabled = true
-        
-        // Tell the timer we were triggered
-        
-        lengthCounter.trigger()
         
         // TODO: Fill this in
     }

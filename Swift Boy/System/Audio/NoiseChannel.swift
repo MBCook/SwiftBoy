@@ -191,6 +191,12 @@ class NoiseChannel: AudioChannel {
     // MARK: - Channel specific functions
     
     private func trigger() {
+        // Tell the timer we were triggered
+        
+        lengthCounter.trigger()
+        
+        // Don't do anything else if we're disabled
+        
         guard dacEnabled else {
             return
         }
@@ -202,10 +208,6 @@ class NoiseChannel: AudioChannel {
         // Enable the channel
         
         enabled = true
-        
-        // Tell the timer we were triggered
-        
-        lengthCounter.trigger()
         
         // TODO: Fill this in
     }
