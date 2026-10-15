@@ -159,8 +159,6 @@ class WaveChannel: AudioChannel {
             return
         }
      
-        print("Channel 3 being disabled")
-        
         // TODO: This
         
         enabled = false
@@ -200,8 +198,6 @@ class WaveChannel: AudioChannel {
         wavePatternNibble = 0
         
         // Enable the channel
-        
-        print("Channel 3 being enabled")
         
         enabled = true
         

@@ -58,8 +58,8 @@ class APU: MemoryMappedDevice {
     
     private var frameSequencer: Register = 0
     
-    var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: true)
-    var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(enableSweep: false)
+    var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(channelSweeps: true)
+    var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(channelSweeps: false)
     var channelThree: WaveChannel = WaveChannel()
     
     private var channelFour: NoiseChannel = NoiseChannel()
@@ -164,8 +164,6 @@ class APU: MemoryMappedDevice {
         
         apuEnabled = true
         
-        print("APU now enabled")
-        
         // TODO: Other stuff?
     }
     
@@ -173,8 +171,6 @@ class APU: MemoryMappedDevice {
         guard apuEnabled else {
             return
         }
-        
-        print("APU now disabled")
         
         // TODO: Clear stuff when this is turned off, see PAN docs
         

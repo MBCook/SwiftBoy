@@ -20,17 +20,20 @@ private let SC2_VOLUME_ENVELOPE: Address = 0xFF17
 private let SC2_PERIOD_LOW: Address = 0xFF18
 private let SC2_PERIOD_HIGH_CONTROL: Address = 0xFF19
 
-private enum SweepDirection {
-    case addition
-    case subtraction
+private enum SweepDirection: RegisterPair {
+    case addition = 1
+    case subtraction = 2
 }
 
 class PulseWithPeriodSweep: AudioChannel {
     // MARK: - Private variables
     
+    private var sweepEnabled: Bool = false
     private var sweepPace: Register = 0
+    private var sweepPaceZero: Bool = false
     private var sweepDirection: SweepDirection = .addition
     private var sweepStep: Register = 0
+    private var sweepPaceCountdown: UInt8 = 0       // Only reset on sweep/trigger, NOT PACE UPDATE
     
     private var dutyCycle: Register = 0
     private var dutyStep: Register = 0
@@ -45,21 +48,22 @@ class PulseWithPeriodSweep: AudioChannel {
     private var envelopePace: Register = 0
     
     private var period: RegisterPair = 0
+    private var shadowPeriod: RegisterPair = 0
     
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
     
-    private var enableSweep = false
+    private var channelSweeps = false
     
     var apu: APU? = nil
     
     // MARK: - Constructor
     
-    init(enableSweep: Bool) {
+    init(channelSweeps: Bool) {
         self.lengthCounter = AudioLengthCounter(64)
         self.lengthCounter.disableChannel = { self.disableChannel() }
         
-        self.enableSweep = enableSweep
+        self.channelSweeps = channelSweeps
     }
     
     // MARK: - Registers
@@ -67,7 +71,7 @@ class PulseWithPeriodSweep: AudioChannel {
     private var sweepRegister: Register {
         get {
             return 0x80     // High bit unused, return 1 in that bit
-                    + sweepPace << 4
+                    + (sweepPaceZero ? 0 : sweepPace << 4)
                     + (sweepDirection == .subtraction ? 0x08 : 0x00)
                     + sweepStep
         }
@@ -76,7 +80,12 @@ class PulseWithPeriodSweep: AudioChannel {
             sweepDirection = (value & 0x08 == 0x08) ? .subtraction : .addition
             sweepStep = value & 0x07
             
-            // TODO: If sweep pace is set to 0, there is special handling needed
+            if sweepPace == 0 {
+                sweepPace = 8           // The GameBoy keeps the timer running, but treats a 0 as an 8
+                sweepPaceZero = true    // So we can keep track of the fact it was really zero
+            } else {
+                sweepPaceZero = false
+            }
         }
     }
     
@@ -162,7 +171,7 @@ class PulseWithPeriodSweep: AudioChannel {
     func reset() {
         // Set things to the boot state
         
-        if enableSweep {
+        if channelSweeps {
             // Channel 1
             
             sweepRegister = 0x80
@@ -181,6 +190,8 @@ class PulseWithPeriodSweep: AudioChannel {
         }
         
         dutyStep = 0
+        shadowPeriod = period
+        sweepPaceCountdown = sweepPace
         
         awaitingFirstTrigger = true
         onFirstTrigger = false
@@ -205,8 +216,6 @@ class PulseWithPeriodSweep: AudioChannel {
         guard enabled else {
             return
         }
-        
-        print("Channel 1 or 2 being disabled")
         
         // TODO: This
         
@@ -236,10 +245,58 @@ class PulseWithPeriodSweep: AudioChannel {
     // MARK: - Public functions
     
     func tickSweep() {
-        // TODO: This
+        sweepPaceCountdown -= 1
+        
+        if sweepPaceCountdown == 0 {
+            // Reset the counter
+            
+            sweepPaceCountdown = sweepPace
+            
+            if (sweepEnabled) {
+                sweep(triggered: false)
+            }
+        }
     }
     
     // MARK: - Private functions
+    
+    func calculateNextPeriod() -> RegisterPair {
+        let denominator: RegisterPair = 1 << sweepStep      // 2 ^ sweepStep
+        let fraction: RegisterPair = shadowPeriod / denominator
+        
+        return shadowPeriod + RegisterPair(sweepDirection.rawValue) * fraction
+    }
+    
+    func sweep(triggered: Bool) {
+        // The logic for if we should calculate or if we should apply is touch
+        
+        let stepExists = sweepStep > 0
+        let shouldCalculate = (triggered && stepExists) ||
+                                (!triggered && !sweepPaceZero)
+        let shouldApply = !triggered && !sweepPaceZero && stepExists
+        
+        guard shouldCalculate else {
+            return
+        }
+        
+        // Figure out the new period, handle it as appropriate
+        
+        let newPeriod = calculateNextPeriod()
+        
+        if newPeriod > 0x07FF {
+            // If we would overflow, don't, disable the channel instead
+            disableChannel()
+        } else if shouldApply {
+            period = newPeriod      // We swept, update the real period
+            shadowPeriod = period   // And reload the shadown period
+            
+            // Figure out what the next period would be. If it will overflow, stop now
+            
+            if calculateNextPeriod() > 0x07FF {
+                disableChannel()
+            }
+        }
+    }
     
     private func trigger() {
         // Tell the timer we were triggered
@@ -250,10 +307,6 @@ class PulseWithPeriodSweep: AudioChannel {
         
         guard dacEnabled else {
             return
-        }
-        
-        if enableSweep {
-            print("\tChannel 1 triggered")
         }
         
         // Track if we've been triggered at least once
@@ -269,8 +322,6 @@ class PulseWithPeriodSweep: AudioChannel {
         
         enabled = true
         
-        print("Channel 1 or 2 being enabled")
-        
         // Reset the duty step index
         
         dutyStep = 0
@@ -278,17 +329,23 @@ class PulseWithPeriodSweep: AudioChannel {
         // TODO: Reload frequency timer
         // TODO: Reload envelope timer
         // TODO: Reload volume
-        // TODO: Sweep stuff
         
+        // Sweep stuff
+        
+        if channelSweeps {
+            shadowPeriod = period
+            sweepPaceCountdown = sweepPace
+            sweepEnabled = !sweepPaceZero || sweepStep > 0
+            
+            if sweepStep > 0 {
+                sweep(triggered: true)
+            }
+        }
     }
     
     private func enableDAC() {
         guard !dacEnabled else {
             return
-        }
-        
-        if enableSweep {
-            print("\tChannel 1 DAC enabled")
         }
         
         dacEnabled = true
@@ -297,10 +354,6 @@ class PulseWithPeriodSweep: AudioChannel {
     private func disableDAC() {
         guard dacEnabled else {
             return
-        }
-        
-        if enableSweep {
-            print("\tChannel 1 DAC disabled")
         }
         
         // Disabling the DAC also disables the channel
@@ -313,7 +366,7 @@ class PulseWithPeriodSweep: AudioChannel {
     // MARK: - MemoryMappedDevice protocol functions
     
     func readRegister(_ address: Address) -> UInt8 {
-        if enableSweep {
+        if channelSweeps {
             // We're at channel 1 addresses
             
             switch address {
@@ -349,7 +402,7 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func writeRegister(_ address: Address, _ value: UInt8) {
-        if enableSweep {
+        if channelSweeps {
             // We're at channel 1 addresses
             
             switch address {
@@ -384,3 +437,4 @@ class PulseWithPeriodSweep: AudioChannel {
         }
     }
 }
+
