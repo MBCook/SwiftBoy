@@ -20,9 +20,9 @@ private let SC2_VOLUME_ENVELOPE: Address = 0xFF17
 private let SC2_PERIOD_LOW: Address = 0xFF18
 private let SC2_PERIOD_HIGH_CONTROL: Address = 0xFF19
 
-private enum SweepDirection: RegisterPair {
-    case addition = 1
-    case subtraction = 2
+private enum SweepDirection {
+    case addition
+    case subtraction
 }
 
 class PulseWithPeriodSweep: AudioChannel {
@@ -33,7 +33,8 @@ class PulseWithPeriodSweep: AudioChannel {
     private var sweepPaceZero: Bool = false
     private var sweepDirection: SweepDirection = .addition
     private var sweepStep: Register = 0
-    private var sweepPaceCountdown: UInt8 = 0       // Only reset on sweep/trigger, NOT PACE UPDATE
+    private var sweepPaceCountdown: UInt8 = 0               // Only reset on sweep/trigger, NOT PACE UPDATE
+    private var negativeSweepSinceLastTrigger: Bool = false
     
     private var dutyCycle: Register = 0
     private var dutyStep: Register = 0
@@ -76,6 +77,8 @@ class PulseWithPeriodSweep: AudioChannel {
                     + sweepStep
         }
         set (value) {
+            let oldSweep = sweepDirection
+            
             sweepPace = (value & 0x7F) >> 4
             sweepDirection = (value & 0x08 == 0x08) ? .subtraction : .addition
             sweepStep = value & 0x07
@@ -85,6 +88,11 @@ class PulseWithPeriodSweep: AudioChannel {
                 sweepPaceZero = true    // So we can keep track of the fact it was really zero
             } else {
                 sweepPaceZero = false
+            }
+            
+            if sweepDirection == .addition && oldSweep == .subtraction && negativeSweepSinceLastTrigger {
+                // This causes the channel to be disabled for some reason
+                disableChannel()
             }
         }
     }
@@ -264,7 +272,11 @@ class PulseWithPeriodSweep: AudioChannel {
         let denominator: RegisterPair = 1 << sweepStep      // 2 ^ sweepStep
         let fraction: RegisterPair = shadowPeriod / denominator
         
-        return shadowPeriod + RegisterPair(sweepDirection.rawValue) * fraction
+        if sweepDirection == .addition {
+            return shadowPeriod + fraction
+        } else {
+            return shadowPeriod - fraction
+        }
     }
     
     func sweep(triggered: Bool) {
@@ -277,6 +289,10 @@ class PulseWithPeriodSweep: AudioChannel {
         
         guard shouldCalculate else {
             return
+        }
+        
+        if sweepDirection == .subtraction {
+            negativeSweepSinceLastTrigger = true
         }
         
         // Figure out the new period, handle it as appropriate
@@ -333,6 +349,7 @@ class PulseWithPeriodSweep: AudioChannel {
         // Sweep stuff
         
         if channelSweeps {
+            negativeSweepSinceLastTrigger = false
             shadowPeriod = period
             sweepPaceCountdown = sweepPace
             sweepEnabled = !sweepPaceZero || sweepStep > 0
