@@ -69,8 +69,8 @@ class PulseWithPeriodSweep: AudioChannel {
     
     private var channelSweeps = false
     
-    private var lastSample: Float16 = 0
-    private var impulseSinceLastSample: Float16 = 0
+    private var lastSample: Float16 = 0.0
+    private var impulseSinceLastSample: Float16 = 0.0
     
     var apu: APU? = nil
     
@@ -251,10 +251,6 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func disableChannel() {
-        guard enabled else {
-            return
-        }
-        
         enabled = false
         lastDutyCycleAdjustedForVolume = 0.0
     }

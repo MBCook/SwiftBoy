@@ -17,18 +17,34 @@ class NoiseChannel: AudioChannel {
     
     private let lengthCounter: AudioLengthCounter
     
-    private var volume: Register = 0
+    private var lastNoiseBit: Bool = false
+    private var lastOutputAdjustedForVolume: Float16 = 0.0
+    
+    private var initialVolume: Register = 0
+    private var actualVolume: Register = 0
+    private var volumeChanged: Bool = false
+    
     private var envelopeDirection: Bool = false
+    private var shadowEnvelopeDirection: Bool = false
     private var envelopePace: Register = 0
+    private var shadowEnvelopePace: Register = 0
+    private var envelopeTicks: Register = 0
     
     private var clockShift: Register = 0
     private var clockDivider: Register = 0
+    private var clockTicks: Int = 0
     
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
     
     private var lowLFSRWidth: Bool = false
     private var lfsr: RegisterPair = 0
+    
+    private var firstCycleSinceRestart = true
+    private var lastNoiseAdjustedForVolume: Float16 = 0.0
+    
+    private var lastSample: Float16 = 0.0
+    private var impulseSinceLastSample: Float16 = 0.0
     
     var apu: APU? = nil
     
@@ -45,12 +61,12 @@ class NoiseChannel: AudioChannel {
     
     private var volumeAndEnvelopeRegister: Register {
         get {
-            return volume << 4
+            return initialVolume << 4
                     + (envelopeDirection ? 0x08 : 0x00)
                     + envelopePace
         }
         set (value) {
-            volume = value >> 4
+            initialVolume = value >> 4
             envelopeDirection = value & 0x08 == 0x08
             envelopePace = value & 0x07
             
@@ -60,6 +76,16 @@ class NoiseChannel: AudioChannel {
                 enableDAC()
             } else {
                 disableDAC()
+            }
+            
+            // For extra craziness, on the original gameboy writting $08 increments the actual volume by 1, wrapping around
+            // Not the initial volume, but what it actually is currently in the shadown register
+            
+            if value == 0x08 && shadowEnvelopeDirection == true && shadowEnvelopePace == 0 {
+                // They hit the conditions
+                
+                actualVolume = (actualVolume + 1) % 16
+                volumeChanged = true
             }
         }
     }
@@ -127,6 +153,18 @@ class NoiseChannel: AudioChannel {
         volumeAndEnvelopeRegister = 0x00
         frequencyAndRandomnessRegister = 0x00
         controlRegister = 0xBF
+        
+        volumeChanged = false
+        
+        lastSample = 0.0
+        impulseSinceLastSample = 0.0
+        lastOutputAdjustedForVolume = 0.0
+        
+        envelopeTicks = 0
+        shadowEnvelopePace = envelopePace
+        shadowEnvelopeDirection = envelopeDirection
+        
+        firstCycleSinceRestart = true
     }
     
     func disableAPU() {
@@ -137,7 +175,8 @@ class NoiseChannel: AudioChannel {
     }
     
     func disableChannel() {
-        enabled = false
+        enabled = false        
+        lastOutputAdjustedForVolume = 0.0
     }
     
     func isEnabled() -> Bool {
@@ -145,7 +184,50 @@ class NoiseChannel: AudioChannel {
     }
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
+        guard enabled else {
+            return
+        }
+        
+        for _ in 1...ticks {
+            clockTicks += 1
+            
+            // Dividing by 4 takes care of this being in T-states not ticks
+            let realDivisor: Int = clockDivider == 0 ? 8 : 16 * Int(clockDivider)
+            let realShift: Int = clockShift == 0 ? 1 : 2 << (clockShift - 1)        // 0 means "no shift"
+            
+            let interval = (realDivisor * realShift) / 4
+            
+            if clockTicks >= interval {
+                clockTicks = 0
+                
+                if firstCycleSinceRestart {
+                    // The very first cycle is always no output, no matter what
+                    
+                    lastNoiseAdjustedForVolume = 0.0
+                    firstCycleSinceRestart = false
+                }
+                
+                advanceNoise()
+                
+                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * Float16(actualVolume) / 15.0
+                
+                let impulseChange = newNoise - lastNoiseAdjustedForVolume
+                lastNoiseAdjustedForVolume = newNoise
+                
+                impulseSinceLastSample += impulseChange
+            } else if volumeChanged {
+                // Because noise can change so slowly, we need to handle this
+                
+                volumeChanged = false
+                
+                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * Float16(actualVolume) / 15.0
+                
+                let impulseChange = newNoise - lastNoiseAdjustedForVolume
+                lastNoiseAdjustedForVolume = newNoise
+                
+                impulseSinceLastSample += impulseChange
+            }
+        }
     }
     
     func tickLengthCounter() {
@@ -153,12 +235,54 @@ class NoiseChannel: AudioChannel {
     }
     
     func tickVolumeEnvelope() {
-        // TODO: This
+        // We have shadow registers becuase changes only take effect when the channel is triggered
+        // Also no envelope changes if the pace is 0 or the channel isn't enabled
+        guard enabled && shadowEnvelopePace > 0 else {
+            return
+        }
+        
+        envelopeTicks += 1
+        
+        if envelopeTicks >= shadowEnvelopePace {
+            // Time to adjust the envelope
+            
+            if shadowEnvelopeDirection == false && actualVolume == 0 {
+                // Can't lower volume that's already at 0
+                // Let's stop ourselves from getting here again
+                shadowEnvelopePace = 0
+                return
+            } else if shadowEnvelopeDirection && actualVolume == 15 {
+                // Can't raise volume that's already at 15 (max)
+                // Let's stop ourselves from getting here again
+                shadowEnvelopePace = 0
+                return
+            }
+            
+            let change = shadowEnvelopeDirection ? 1 : -1
+            
+            actualVolume += UInt8(Int(actualVolume) + change)
+            
+            volumeChanged = true
+            
+            envelopeTicks = 0
+        }
     }
 
+    func collectSample() -> Float16 {
+        guard enabled else {
+            return 0.0
+        }
+        
+        lastSample += impulseSinceLastSample
+        
+        impulseSinceLastSample = 0.0
+        
+        return lastSample
+    }
+    
     // MARK: - Private functions
     
-    private func tickNoise() -> VolumeLevel {
+    private func advanceNoise() {
         let bitZero = lfsr & 0x0001
         let bitOne = (lfsr & 0x0002) >> 1
         let equals = bitZero == bitOne  // XNOR operation
@@ -175,11 +299,9 @@ class NoiseChannel: AudioChannel {
         
         // Bit 0 will be the return (clear = silent, set = volume in channel 4 volume/envelope register)
         
-        let output = lfsr & 0x0001
+        lastNoiseBit = lfsr & 0x0001 > 0
         
         lfsr >>= 1
-        
-        return output == 0x0001 ? volume : 0x00
     }
     
     // MARK: - Channel specific functions
@@ -199,11 +321,23 @@ class NoiseChannel: AudioChannel {
         
         lfsr = 0xFFFF
         
+        clockTicks = 0
+        
         // Enable the channel
         
         enabled = true
+
+        actualVolume = initialVolume
+        envelopeTicks = 0
+        shadowEnvelopePace = envelopePace
+        shadowEnvelopeDirection = envelopeDirection
         
-        // TODO: Fill this in
+        volumeChanged = false
+        
+        // Sample stuff
+        
+        lastSample = 0.0
+        impulseSinceLastSample = 0.0
     }
     
     private func enableDAC() {

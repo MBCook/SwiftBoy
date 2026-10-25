@@ -30,7 +30,7 @@ class WaveChannel: AudioChannel {
     
     private let lengthCounter: AudioLengthCounter
     
-    private var outputLevel: Register = 0
+    private var actualVolume: Register = 0
     private var period: UInt16 = 0
     
     private var wavePatternNibble: Register = 0
@@ -66,10 +66,10 @@ class WaveChannel: AudioChannel {
     
     private var outputLevelRegister: Register {
         get {
-            return 0b10011111 + (outputLevel << 5)    // All ignored bits are 1s
+            return 0b10011111 + (actualVolume << 5)    // All ignored bits are 1s
         }
         set (value) {
-            outputLevel = (value & 0x7F) >> 5
+            actualVolume = (value & 0x7F) >> 5
         }
     }
     
