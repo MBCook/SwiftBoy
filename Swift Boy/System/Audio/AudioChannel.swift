@@ -18,7 +18,9 @@ protocol AudioChannel: MemoryMappedDevice {
     
     func tick(_ ticks: Ticks)
     
-    func tickAPU()
     func tickLengthCounter()
     func tickVolumeEnvelope()
+    
+    // A single sample is the accumulated change for ~1/44100th of a second, -1 to 1, full volume
+    func collectSample() -> Float16
 }

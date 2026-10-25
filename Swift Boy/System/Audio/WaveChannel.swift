@@ -158,8 +158,6 @@ class WaveChannel: AudioChannel {
         guard enabled else {
             return
         }
-     
-        // TODO: This
         
         enabled = false
     }
@@ -169,10 +167,6 @@ class WaveChannel: AudioChannel {
     }
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
-    }
-    
-    func tickAPU() {
         // TODO: This
     }
     

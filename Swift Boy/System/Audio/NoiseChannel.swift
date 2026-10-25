@@ -45,7 +45,7 @@ class NoiseChannel: AudioChannel {
     
     private var volumeAndEnvelopeRegister: Register {
         get {
-            return volume << 4          // TODO: Represents the volume the user TOLD us, not the CURRENT volume due to sweep
+            return volume << 4
                     + (envelopeDirection ? 0x08 : 0x00)
                     + envelopePace
         }
@@ -137,8 +137,6 @@ class NoiseChannel: AudioChannel {
     }
     
     func disableChannel() {
-        // TODO: This
-        
         enabled = false
     }
     
@@ -147,10 +145,6 @@ class NoiseChannel: AudioChannel {
     }
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
-    }
-    
-    func tickAPU() {
         // TODO: This
     }
     

@@ -25,6 +25,13 @@ private enum SweepDirection {
     case subtraction
 }
 
+private let DUTY_CYCLES: Array<Array<Float16>> = [
+    [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0],
+    [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0],
+    [-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0],
+    [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, 1.0]
+]
+
 class PulseWithPeriodSweep: AudioChannel {
     // MARK: - Private variables
     
@@ -38,23 +45,32 @@ class PulseWithPeriodSweep: AudioChannel {
     
     private var dutyCycle: Register = 0
     private var dutyStep: Register = 0
-    private var awaitingFirstTrigger: Bool = false
-    private var onFirstTrigger: Bool = false
+    private var firstCycleSinceRestart = true
+    private var lastDutyCycleAdjustedForVolume: Float16 = 0.0
 
     private let lengthCounter: AudioLengthCounter
     
-    private var volume: Register = 0
+    private var initialVolume: Register = 0
+    private var actualVolume: Register = 0
     
     private var envelopeDirection: Bool = false
+    private var shadowEnvelopeDirection: Bool = false
     private var envelopePace: Register = 0
+    private var shadowEnvelopePace: Register = 0
+    private var envelopeTicks: Register = 0
     
     private var period: RegisterPair = 0
     private var shadowPeriod: RegisterPair = 0
+    
+    private var periodCounter: UInt16 = 0
     
     private var enabled: Bool = false
     private var dacEnabled: Bool = false
     
     private var channelSweeps = false
+    
+    private var lastSample: Float16 = 0
+    private var impulseSinceLastSample: Float16 = 0
     
     var apu: APU? = nil
     
@@ -110,12 +126,12 @@ class PulseWithPeriodSweep: AudioChannel {
     
     private var volumeAndEnvelopeRegister: Register {
         get {
-            return volume << 4          // TODO: Represents the volume the user TOLD us, not the CURRENT volume due to sweep
+            return initialVolume << 4
                     + (envelopeDirection ? 0x08 : 0x00)
                     + envelopePace
         }
         set (value) {
-            volume = value >> 4
+            initialVolume = value >> 4
             envelopeDirection = value & 0x08 == 0x08
             envelopePace = value & 0x07
             
@@ -125,6 +141,15 @@ class PulseWithPeriodSweep: AudioChannel {
                 enableDAC()
             } else {
                 disableDAC()
+            }
+            
+            // For extra craziness, on the original gameboy writting $08 increments the actual volume by 1, wrapping around
+            // Not the initial volume, but what it actually is currently in the shadown register
+            
+            if value == 0x08 && shadowEnvelopeDirection == true && shadowEnvelopePace == 0 {
+                // They hit the conditions
+                
+                actualVolume = (actualVolume + 1) % 16
             }
         }
     }
@@ -198,11 +223,19 @@ class PulseWithPeriodSweep: AudioChannel {
         }
         
         dutyStep = 0
+        periodCounter = 0
         shadowPeriod = period
         sweepPaceCountdown = sweepPace
         
-        awaitingFirstTrigger = true
-        onFirstTrigger = false
+        firstCycleSinceRestart = true
+        
+        lastSample = 0.0
+        impulseSinceLastSample = 0.0
+        lastDutyCycleAdjustedForVolume = 0.0
+        
+        envelopeTicks = 0
+        shadowEnvelopePace = envelopePace
+        shadowEnvelopeDirection = envelopeDirection
     }
     
     func disableAPU() {        
@@ -215,9 +248,6 @@ class PulseWithPeriodSweep: AudioChannel {
         periodHighAndControlRegister = 0x00
         
         dutyStep = 0
-        
-        awaitingFirstTrigger = true
-        onFirstTrigger = false
     }
     
     func disableChannel() {
@@ -225,9 +255,8 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
-        // TODO: This
-        
         enabled = false
+        lastDutyCycleAdjustedForVolume = 0.0
     }
     
     func isEnabled() -> Bool {
@@ -235,11 +264,43 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
-    }
-    
-    func tickAPU() {
-        // TODO: This
+        guard enabled else {
+            return
+        }
+        
+        for _ in 1...ticks {
+            periodCounter += 1
+            
+            if periodCounter >= 0x0800 {
+                var lastDutyCycleOutput = lastDutyCycleAdjustedForVolume
+                
+                if firstCycleSinceRestart {
+                    // The very first cycle is always no output, no matter what
+                    
+                    lastDutyCycleOutput = 0.0
+                    firstCycleSinceRestart = false
+                }
+                
+                // It overflowed. Reset it and tick the duty step.
+                
+                periodCounter = period
+                dutyStep = (dutyStep + 1) % 8
+                
+                // Since we changed steps, collect impulse
+                
+                var newDutyCycleOutput = DUTY_CYCLES[Int(dutyCycle)][Int(dutyStep)]
+                
+                // Adjust for volume
+                
+                newDutyCycleOutput *= Float16(actualVolume) / 15.0
+                
+                // Calculate change and accrue it
+                
+                var impulseChange = newDutyCycleOutput - lastDutyCycleOutput
+                
+                impulseSinceLastSample += impulseChange
+            }
+        }
     }
     
     func tickLengthCounter() {
@@ -247,7 +308,35 @@ class PulseWithPeriodSweep: AudioChannel {
     }
     
     func tickVolumeEnvelope() {
-        // TODO: This
+        // We have shadow registers becuase changes only take effect when the channel is triggered
+        // Also no envelope changes if the pace is 0 or the channel isn't enabled
+        guard enabled && shadowEnvelopePace > 0 else {
+            return
+        }
+        
+        envelopeTicks += 1
+        
+        if envelopeTicks >= shadowEnvelopePace {
+            // Time to adjust the envelope
+            
+            if shadowEnvelopeDirection == false && actualVolume == 0 {
+                // Can't lower volume that's already at 0
+                // Let's stop ourselves from getting here again
+                shadowEnvelopePace = 0
+                return
+            } else if shadowEnvelopeDirection && actualVolume == 15 {
+                // Can't raise volume that's already at 15 (max)
+                // Let's stop ourselves from getting here again
+                shadowEnvelopePace = 0
+                return
+            }
+            
+            let change = shadowEnvelopeDirection ? 1 : -1
+            
+            actualVolume += UInt8(Int(actualVolume) + change)
+            
+            envelopeTicks = 0
+        }
     }
     
     // MARK: - Public functions
@@ -266,9 +355,21 @@ class PulseWithPeriodSweep: AudioChannel {
         }
     }
     
+    func collectSample() -> Float16 {
+        guard enabled else {
+            return 0.0
+        }
+        
+        lastSample += impulseSinceLastSample
+        
+        impulseSinceLastSample = 0.0
+        
+        return lastSample
+    }
+    
     // MARK: - Private functions
     
-    func calculateNextPeriod() -> RegisterPair {
+    private func calculateNextPeriod() -> RegisterPair {
         let denominator: RegisterPair = 1 << sweepStep      // 2 ^ sweepStep
         let fraction: RegisterPair = shadowPeriod / denominator
         
@@ -279,7 +380,7 @@ class PulseWithPeriodSweep: AudioChannel {
         }
     }
     
-    func sweep(triggered: Bool) {
+    private func sweep(triggered: Bool) {
         // The logic for if we should calculate or if we should apply is touch
         
         let stepExists = sweepStep > 0
@@ -325,26 +426,16 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
-        // Track if we've been triggered at least once
-        
-        if awaitingFirstTrigger {
-            // We got our first trigger!
-            
-            awaitingFirstTrigger = false
-            onFirstTrigger = true
-        }
-        
         // Enable the channel
         
         enabled = true
         
-        // Reset the duty step index
-        
-        dutyStep = 0
-        
-        // TODO: Reload frequency timer
-        // TODO: Reload envelope timer
-        // TODO: Reload volume
+        // Note: The duty step IS NOT reset on trigger
+
+        actualVolume = initialVolume
+        envelopeTicks = 0
+        shadowEnvelopePace = envelopePace
+        shadowEnvelopeDirection = envelopeDirection
         
         // Sweep stuff
         
@@ -358,6 +449,15 @@ class PulseWithPeriodSweep: AudioChannel {
                 sweep(triggered: true)
             }
         }
+        
+        // Update the period counter from the period (keeping the loweset two bits becuase GB does)
+        
+        periodCounter = (period & 0xFFFC) + (periodCounter & 0x0003)
+        
+        // Sampling stuff
+        
+        lastSample = 0.0
+        impulseSinceLastSample = 0.0
     }
     
     private func enableDAC() {

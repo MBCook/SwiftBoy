@@ -53,6 +53,14 @@ private let FIFTY_DUTY_CYCLE: [VolumeLevel] = [0x00, 0x0F, 0x0F, 0x0F, 0x0F, 0x0
 private let SEVENTY_FIVE_DUTY_CYCLE: [VolumeLevel] = [0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F,
                                                       0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F]
 
+private let SAMPLE_RATE: Float = 44100.0
+private let SAMPLE_LENGTH: Float = 1.0 / SAMPLE_RATE    // How long one audio sample should be, in fractions of a second
+private let CPU_FREQUENCY: Float = 4194304.0
+private let TICKS_PER_SECOND: Float = CPU_FREQUENCY / 4
+private let TICK_LENGTH: Float = 1.0 / TICKS_PER_SECOND
+private let TICKS_PER_SAMPLE = SAMPLE_LENGTH / TICK_LENGTH      // How many ticks are in each sample
+private let TWENTY_MS_OF_SAMPLES = Int(0.02 * SAMPLE_LENGTH)    // How many elements is 20ms worth of samples?
+
 class APU: MemoryMappedDevice {
     // MARK: - Private variables
     
@@ -61,8 +69,12 @@ class APU: MemoryMappedDevice {
     var channelOne: PulseWithPeriodSweep = PulseWithPeriodSweep(channelSweeps: true)
     var channelTwo: PulseWithPeriodSweep = PulseWithPeriodSweep(channelSweeps: false)
     var channelThree: WaveChannel = WaveChannel()
+    var channelFour: NoiseChannel = NoiseChannel()
     
-    private var channelFour: NoiseChannel = NoiseChannel()
+    private var channelOneSamples: Array<Float16> = Array()
+    private var channelTwoSamples: Array<Float16> = Array()
+    private var channelThreeSamples: Array<Float16> = Array()
+    private var channelFourSamples: Array<Float16> = Array()
     
     private let channels: [AudioChannel]
     
@@ -70,6 +82,8 @@ class APU: MemoryMappedDevice {
     
     private var leftVolume: Register = 0
     private var rightVolume: Register = 0
+    
+    private var ticksSinceLastSample: Float = 0.0
     
     // We don't support VIN, but need to track these in case a games care
     
@@ -141,6 +155,11 @@ class APU: MemoryMappedDevice {
         channelTwo.apu = self
         channelThree.apu = self
         channelFour.apu = self
+        
+        channelOneSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
+        channelTwoSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
+        channelThreeSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
+        channelFourSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
     }
     
     // MARK: - Public functions
@@ -201,17 +220,26 @@ class APU: MemoryMappedDevice {
     // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
-        // TODO: This? Or does divTick do everything we need?
+        // Tick each channel. This lets them book-keep so when we need to collect a sample we have what we need
         
         channels.forEach { c in c.tick(ticks) }
+        
+        // Is it time to get a new sample from the channels?
+        
+        ticksSinceLastSample += Float(ticks)
+        
+        if ticksSinceLastSample > TICKS_PER_SAMPLE {
+            ticksSinceLastSample -= TICKS_PER_SAMPLE
+            
+            channelOneSamples.append(channelOne.collectSample())
+            channelTwoSamples.append(channelTwo.collectSample())
+            channelThreeSamples.append(channelThree.collectSample())
+            channelFourSamples.append(channelFour.collectSample())
+        }
     }
     
     func divTick() {
-        // We have to do a couple of tasks at different frequencies based on div ticks
-        // First let the channels do whatever they want
-        
-        channels.forEach { c in c.tickAPU() }
-        
+        // We have to do a couple of tasks at different frequencies based on div ticks        
         // Length counts happen on even cycles
         
         if frameSequencer % 2 == 0 {
