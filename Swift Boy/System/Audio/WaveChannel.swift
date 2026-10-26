@@ -31,10 +31,19 @@ class WaveChannel: AudioChannel {
     private let lengthCounter: AudioLengthCounter
     
     private var actualVolume: Register = 0
+    private var volumeChanged: Bool = false
+    
     private var period: UInt16 = 0
+    private var periodCounter: UInt16 = 0
     
     private var wavePatternNibble: Register = 0
-    private var wavePatternBuffer: Register = 0
+    
+    private var wavePattern: [Register] = [Register](repeating: 0, count: 16)
+    
+    private var lastWaveOutputAdjustedForVolume: Float16 = 0.0
+    
+    private var lastSample: Float16 = 0.0
+    private var impulseSinceLastSample: Float16 = 0.0
     
     var apu: APU? = nil
     
@@ -70,6 +79,7 @@ class WaveChannel: AudioChannel {
         }
         set (value) {
             actualVolume = (value & 0x7F) >> 5
+            volumeChanged = true
         }
     }
     
@@ -118,8 +128,6 @@ class WaveChannel: AudioChannel {
         }
     }
     
-    private var wavePattern: [Register] = [Register](repeating: 0, count: 16)
-    
     // MARK: - Constructor
     
     init() {
@@ -140,7 +148,14 @@ class WaveChannel: AudioChannel {
 
         wavePattern = [Register](repeating: 0, count: 16)
         wavePatternNibble = 0
-        wavePatternBuffer = 0
+        periodCounter = 0
+        
+        volumeChanged = false
+        
+        lastSample = 0.0
+        impulseSinceLastSample = 0.0
+        
+        lastWaveOutputAdjustedForVolume = 0.0
     }
     
     func disableAPU() {
@@ -151,7 +166,9 @@ class WaveChannel: AudioChannel {
         periodHighAndControlRegister = 0x00
         
         wavePatternNibble = 0
-        wavePatternBuffer = 0
+        periodCounter = 0
+        
+        lastWaveOutputAdjustedForVolume = 0.0
     }
     
     func disableChannel() {
@@ -167,18 +184,134 @@ class WaveChannel: AudioChannel {
     }
     
     func tick(_ ticks: Ticks) {
-        // TODO: This
+        guard enabled else {
+            return
+        }
+        
+        for _ in 1...ticks {
+            periodCounter += 2      // Runs twice as fast as the square wave channels
+            
+            if periodCounter >= 0x0800 {
+                // Advance the pointer
+                
+                wavePatternNibble = (wavePatternNibble + 1) % 32
+                
+                // Save what we had last
+                
+                let lastWaveOutput = lastWaveOutputAdjustedForVolume
+                
+                // It overflowed. Reset it and tick the duty step.
+                
+                periodCounter = period
+                
+                // Get that new nibble
+                
+                var nibble = Int(wavePattern[Int(wavePatternNibble) / 2])
+                
+                if wavePatternNibble % 2 == 0 {
+                    // High nibble, get what we want
+                    
+                    nibble = nibble >> 4
+                } else {
+                    // Low nibble, mask out the high stuff
+                    
+                    nibble = nibble & 0x0F
+                }
+                
+                // Calculate the output
+                
+                let newWaveOutput = currentNibbleToSample()
+                
+                lastWaveOutputAdjustedForVolume = newWaveOutput
+                
+                // Calculate change and accrue it
+                
+                impulseSinceLastSample += newWaveOutput - lastWaveOutput
+            } else if volumeChanged {
+                // Change the sample we're outputting
+                
+                volumeChanged = false
+                
+                // Temporarily hold the last value we put out
+                
+                let lastWaveOutput = lastWaveOutputAdjustedForVolume
+                
+                // Re-calculate the output
+                
+                let newWaveOutput = currentNibbleToSample()
+                
+                lastWaveOutputAdjustedForVolume = newWaveOutput
+                
+                // Calculate change and accrue it
+                
+                impulseSinceLastSample += newWaveOutput - lastWaveOutput
+            }
+        }
     }
+    
     
     func tickLengthCounter() {
         lengthCounter.tickLengthCounter()
     }
     
     func tickVolumeEnvelope() {
-        // TODO: This
+        // Not a feature, ignored
+    }
+    
+    func collectSample() -> Float16 {
+        guard enabled else {
+            return 0.0
+        }
+        
+        lastSample += impulseSinceLastSample
+        
+        impulseSinceLastSample = 0.0
+        
+        return lastSample
     }
     
     // MARK: - Channel specific functions
+    
+    private func currentNibbleToSample() -> Float16 {
+        // First get the nibble
+        
+        var nibble = Int(wavePattern[Int(wavePatternNibble) / 2])
+        
+        if wavePatternNibble % 2 == 0 {
+            // High nibble, get what we want
+            
+            nibble = nibble >> 4
+        } else {
+            // Low nibble, mask out the high stuff
+            
+            nibble = nibble & 0x0F
+        }
+        
+        // Now we adjust for volume. It's done at this stage and not in floats
+        
+        nibble = switch actualVolume {
+            case 0: nibble                      // Mute, but it's irrelevant as we handle it later
+            case 1: nibble                      // 100% volume
+            case 2: nibble >> 1                 // 50% volume
+            case 3: nibble >> 2                 // 25% volume
+            default: fatalError("Unreachable")
+        }
+    
+        // We have our value, now we need to turn it into our float range.
+        // The values are stange. 0 means "1.0" and 15 means "-1.0".
+        
+        var output = Float16(nibble) / 15.0     // 0 to 1.0 is 1.0 to -1.0
+        output = output * 2.0                   // 0 to 2.0 is 1.0 to -1.0
+        output = output - 1.0                   // -1.0 to 1.0 is 1.0 to -1.0
+        output *= -1.0                          // Finally correct
+        
+        if actualVolume == 0 {
+            // This is where we mute for real
+            output = 0.0
+        }
+        
+        return output
+    }
     
     private func trigger() {
         // Tell the timer we were triggered
@@ -187,15 +320,29 @@ class WaveChannel: AudioChannel {
         
         // Don't do anything else if we're disabled
         
+        guard dacEnabled else {
+            return
+        }
+        
+        // Don't do anything else if we're disabled
+        
         // Reset where to load the next nibble from but DON'T clear the buffer
         
-        wavePatternNibble = 0
+        wavePatternNibble = 0   // Really starts at nibble 1, not 0. But we increment first thing so this is right
+        
+        periodCounter = 0
+        
+        volumeChanged = false
         
         // Enable the channel
         
         enabled = true
         
-        // TODO: Fill this in
+        // Reset the period
+        
+        periodCounter = period
+        
+        // This channel does not reset the output on trigger, it holds what was last until the next change
     }
     
     private func enableDAC() {

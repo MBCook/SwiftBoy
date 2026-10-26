@@ -288,13 +288,13 @@ class PulseWithPeriodSweep: AudioChannel {
                 
                 // Adjust for volume
                 
-                newDutyCycleOutput *= Float16(actualVolume) / 15.0
+                newDutyCycleOutput *= Float16(actualVolume) / 16.0
+                
+                lastDutyCycleAdjustedForVolume = newDutyCycleOutput
                 
                 // Calculate change and accrue it
                 
-                var impulseChange = newDutyCycleOutput - lastDutyCycleOutput
-                
-                impulseSinceLastSample += impulseChange
+                impulseSinceLastSample += newDutyCycleOutput - lastDutyCycleOutput
             }
         }
     }
