@@ -26,7 +26,8 @@ let FRAME_SAMPLE_COUNT = 60
 let NANOSECONDS_IN_SECOND: Double = 1_000_000_000
 let NANOSECONDS_IN_MILLISECOND: UInt64 = 1_000_000
 
-class SwiftBoy: ObservableObject {
+@MainActor
+class SwiftBoy: ObservableObject, @unchecked Sendable {
     // MARK: - Our private variables
     
     private var cpu: CPU

@@ -264,7 +264,7 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
-        for _ in 1...ticks {
+        for _ in 0...ticks {
             periodCounter += 1
             
             if periodCounter >= 0x0800 {
@@ -329,7 +329,7 @@ class PulseWithPeriodSweep: AudioChannel {
             
             let change = shadowEnvelopeDirection ? 1 : -1
             
-            actualVolume += UInt8(Int(actualVolume) + change)
+            actualVolume = UInt8(Int(actualVolume) + change)
             
             envelopeTicks = 0
         }

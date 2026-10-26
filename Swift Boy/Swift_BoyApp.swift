@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 @main
 struct Swift_BoyApp: App {
     // MARK: - Our scene for our app
@@ -35,9 +36,9 @@ struct Swift_BoyApp: App {
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Dr. Mario.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Super Mario Land.gb")
-         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
+//         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
 
-//+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/01-registers.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/02-len ctr.gb")
@@ -65,7 +66,7 @@ struct Swift_BoyApp: App {
             
             // Start things running
             
-            backgroundTask = Task.detached(priority: .userInitiated) {
+            backgroundTask = Task(priority: .userInitiated) {
                 await boy.run()
             }
         } catch {
@@ -73,3 +74,4 @@ struct Swift_BoyApp: App {
         }
     }
 }
+

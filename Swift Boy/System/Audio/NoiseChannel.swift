@@ -260,7 +260,7 @@ class NoiseChannel: AudioChannel {
             
             let change = shadowEnvelopeDirection ? 1 : -1
             
-            actualVolume += UInt8(Int(actualVolume) + change)
+            actualVolume = UInt8(Int(actualVolume) + change)
             
             volumeChanged = true
             
@@ -289,7 +289,7 @@ class NoiseChannel: AudioChannel {
         
         // If they're equal, set bit 15. It should always be clear before this due the the right shift.
         
-        lfsr = lfsr + (equals ? 0x8000 : 0x0000)
+        lfsr = lfsr | (equals ? 0x8000 : 0x0000)
         
         // Do the same to bit 7 if we're in low LFSR width mode (have to clear it just in case)
         

@@ -158,8 +158,8 @@ class Memory {
                 // The Blargg test roms (and Gameboy Doctor) write a byte to 0xFF01 and then 0x81 to 0xFF02 to print it to the serial line.
                 // This duplicates what's printed to the screen. Since we don't have the screen setup, that's handy.
                 
-                print(String(cString: [ioRegisters[Int(MemoryLocations.serialData - MemoryLocations.ioRegisterRange.lowerBound)],
-                                       0x00]), terminator: "")
+                print(String(decoding: [ioRegisters[Int(MemoryLocations.serialData - MemoryLocations.ioRegisterRange.lowerBound)],
+                                        0x00], as: UTF8.self), terminator: "")
                 
                 return
             }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Synchronization
 
 private let CHANNEL_ONE_RANGE: ClosedRange<Address> = 0xFF10...0xFF14
 private let CHANNEL_TWO_RANGE: ClosedRange<Address> = 0xFF16...0xFF19
@@ -61,6 +62,21 @@ private let TICK_LENGTH: Float = 1.0 / TICKS_PER_SECOND
 private let TICKS_PER_SAMPLE = SAMPLE_LENGTH / TICK_LENGTH      // How many ticks are in each sample
 private let TWENTY_MS_OF_SAMPLES = Int(0.02 * SAMPLE_LENGTH)    // How many elements is 20ms worth of samples?
 
+class APUSamples {
+    private var leftChannelSamples: Array<Float16> = Array()
+    private var rightChannelSamples: Array<Float16> = Array()
+    
+    init() {
+        leftChannelSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
+        rightChannelSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
+    }
+    
+    func addSample(left: Float16, right: Float16) {
+        leftChannelSamples.append(left)
+        rightChannelSamples.append(right)
+    }
+}
+
 class APU: MemoryMappedDevice {
     // MARK: - Private variables
     
@@ -71,10 +87,7 @@ class APU: MemoryMappedDevice {
     var channelThree: WaveChannel = WaveChannel()
     var channelFour: NoiseChannel = NoiseChannel()
     
-    private var channelOneSamples: Array<Float16> = Array()
-    private var channelTwoSamples: Array<Float16> = Array()
-    private var channelThreeSamples: Array<Float16> = Array()
-    private var channelFourSamples: Array<Float16> = Array()
+    private let samples: Mutex<APUSamples> = Mutex.init(APUSamples())
     
     private let channels: [AudioChannel]
     
@@ -155,11 +168,6 @@ class APU: MemoryMappedDevice {
         channelTwo.apu = self
         channelThree.apu = self
         channelFour.apu = self
-        
-        channelOneSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
-        channelTwoSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
-        channelThreeSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
-        channelFourSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
     }
     
     // MARK: - Public functions
@@ -226,16 +234,66 @@ class APU: MemoryMappedDevice {
         
         // Is it time to get a new sample from the channels?
         
-        ticksSinceLastSample += Float(ticks)
-        
-        if ticksSinceLastSample > TICKS_PER_SAMPLE {
-            ticksSinceLastSample -= TICKS_PER_SAMPLE
-            
-            channelOneSamples.append(channelOne.collectSample())
-            channelTwoSamples.append(channelTwo.collectSample())
-            channelThreeSamples.append(channelThree.collectSample())
-            channelFourSamples.append(channelFour.collectSample())
-        }
+//        ticksSinceLastSample += Float(ticks)
+//        
+//        if ticksSinceLastSample > TICKS_PER_SAMPLE {
+//            ticksSinceLastSample -= TICKS_PER_SAMPLE
+//                        
+//            let channelOneSample = channelOne.collectSample()
+//            let channelTwoSample = channelTwo.collectSample()
+//            let channelThreeSample = channelThree.collectSample()
+//            let channelFourSample = channelFour.collectSample()
+//            
+//            var leftSample: Float16 = 0.0
+//            var rightSample: Float16 = 0.0
+//            
+//            // Ok merge things the way the APU does
+//            
+//            if apuEnabled {
+//                // Use the panning register to put things in the right places
+//                
+//                if soundPanningRegister & 0x80 > 0 {
+//                    leftSample += channelFourSample
+//                }
+//                if soundPanningRegister & 0x40 > 0 {
+//                    leftSample += channelThreeSample
+//                }
+//                if soundPanningRegister & 0x20 > 0 {
+//                    leftSample += channelTwoSample
+//                }
+//                if soundPanningRegister & 0x10 > 0 {
+//                    leftSample += channelOneSample
+//                }
+//                if soundPanningRegister & 0x08 > 0 {
+//                    rightSample += channelFourSample
+//                }
+//                if soundPanningRegister & 0x04 > 0 {
+//                    rightSample += channelThreeSample
+//                }
+//                if soundPanningRegister & 0x02 > 0 {
+//                    rightSample += channelTwoSample
+//                }
+//                if soundPanningRegister & 0x01 > 0 {
+//                    rightSample += channelOneSample
+//                }
+//                
+//                // Normalize
+//                
+//                leftSample /= 4.0
+//                rightSample /= 4.0
+//                
+//                // Adjust for volume
+//                
+//                leftSample *= (Float16(leftVolume) + 1.0) / 8.0
+//                rightSample *= (Float16(rightVolume) + 1.0) / 8.0
+//                
+//                // Store them
+//                
+//                samples.withLock {
+//                    $0.addSample(left: leftSample, right: rightSample)
+//                }
+//            }
+//        }
     }
     
     func divTick() {
