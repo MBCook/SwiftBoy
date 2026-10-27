@@ -94,16 +94,17 @@ private typealias ColumnNumber = UInt8
 private typealias LineNumber = UInt8
 private typealias PixelCoordinate = Int16       // We have to deal with negative numbers and numbers over 127, so UInt8 and Int8 won't work
 
-class PPU: MemoryMappedDevice, ObservableObject {
+typealias AsyncFrameCallback = @Sendable (Data?) async -> Void
+typealias FrameCallback = @Sendable (Data?) -> Void
+
+class PPU: MemoryMappedDevice {
     
     // MARK: - Our private data
     
     private var videoRAM: Data!                 // Built in RAM to hold sprites and tiles
     private var oamRAM: Data!                   // RAM that controls sprite/timemap display
     
-    private var nextFrame: Data!                // The next frame in progress
-    
-    private var frameAvailable = false          // If a frame has been generated since last check by external source
+    private var framebuffer: Data!              // The next frame in progress
     
     private var ppuMode: Register = 0           // Current PPU mode
     private var ticksIntoLine: UInt8 = 0
@@ -135,17 +136,15 @@ class PPU: MemoryMappedDevice, ObservableObject {
     private var windowY: Register = 0
     private var windowX: Register = 0
     
-    // MARK: - Public properties
-    
-    @Published
-    private(set) var currentFrame: Data!        // The most recently completed frame
+    private var onFrame: FrameCallback          // Called when a frame is done
     
     // MARK: - Public interface
     
-    init(dmaController: DMAController) {
+    init(dmaController: DMAController, onFrame: @escaping FrameCallback) {
         // Save references to the other objects
         
         self.dmaController = dmaController
+        self.onFrame = onFrame
         
         // Setup the rest the way it is on startup
         
@@ -160,8 +159,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
         
         // Our two "framebuffers" (which only store the numbers 0-3 for final GB colors, not RGB values)
         
-        currentFrame = Data(count: PIXELS_WIDE * PIXELS_TALL)
-        nextFrame = Data(count: PIXELS_WIDE * PIXELS_TALL)
+        framebuffer = Data(count: PIXELS_WIDE * PIXELS_TALL)
         
         // Setup our registers based on what the boot ROM would
         
@@ -174,7 +172,6 @@ class PPU: MemoryMappedDevice, ObservableObject {
         lcdStatus = 0x85                       // Default status from bootup
         ticksIntoLine = 0
         ppuMode = PPUMode.verticalBlank
-        frameAvailable = false
         
         // The rest we'll just set to 0x00 unless the hardware sets it based on state like the LCD status
         
@@ -242,7 +239,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
                     
                     for y in 0..<PIXELS_TALL {
                         let start = y * PIXELS_WIDE
-                        dumpLine(nextFrame.subdata(in: start..<start + PIXELS_WIDE))
+                        dumpLine(framebuffer.subdata(in: start..<start + PIXELS_WIDE))
                     }
                     
                     // Divider
@@ -250,11 +247,8 @@ class PPU: MemoryMappedDevice, ObservableObject {
                     print(String(repeating: "-", count: 160))
                 }
                 
-                // Swap our buffers so external people can get the last full frame now that we've drawn it
-                (currentFrame, nextFrame) = (nextFrame, currentFrame)
-                
-                // And record that new frame is ready
-                frameAvailable = true
+                // And record that new frame is ready (passing a copy, not our local copy)
+                onFrame(Data(framebuffer))
                 
                 needsStatInterrupt = lcdStatus & LCDStatus.vBankInterruptSource > 0     // Flag stat interrupt if enabled
                 needsVBlankInterrupt = true                                             // Always flag the vblank
@@ -280,7 +274,7 @@ class PPU: MemoryMappedDevice, ObservableObject {
                 
                 let startIndex = Int(lcdYCoordinate) * PIXELS_WIDE
                 
-                nextFrame.replaceSubrange(startIndex..<startIndex + PIXELS_WIDE, with: lineData)
+                framebuffer.replaceSubrange(startIndex..<startIndex + PIXELS_WIDE, with: lineData)
             } else if ticksIntoLine > TICKS_PER_SCAN + TICKS_PER_DRAW && ppuMode != PPUMode.horizontablBlank {
                 // Transition to Horizontal Blank
                 
@@ -314,18 +308,6 @@ class PPU: MemoryMappedDevice, ObservableObject {
         } else {
             return nil
         }
-    }
-    
-    func framebuffer() -> Data {
-        // Record they got the frame data
-        
-        frameAvailable = false
-        
-        return currentFrame
-    }
-    
-    func frameReady() -> Bool {
-        return frameAvailable
     }
     
     // MARK: - Private methods for rending a line of pixels

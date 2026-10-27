@@ -15,7 +15,7 @@ struct Swift_BoyApp: App {
     var body: some Scene {
         WindowGroup {
             SwiftBoyView()
-                .environmentObject(swiftBoy)
+                .environmentObject(display)
                 .onDisappear {
                     NSApplication.shared.terminate(self)
                 }
@@ -24,6 +24,7 @@ struct Swift_BoyApp: App {
     
     // MARK: - Private variables we need to keep track of
     
+    private var display: EmulatorDisplay
     private var swiftBoy: SwiftBoy
     private var backgroundTask: Task<(), Never>!
     
@@ -34,11 +35,11 @@ struct Swift_BoyApp: App {
 
 //         let romURL = URL(filePath: "/Users/michael/Downloads/mooneye/manual-only/sprite_priority.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Dr. Mario.gb")
-//         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
+         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Super Mario Land.gb")
 //         let romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
 
-        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
+//        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/instr_timing/instr_timing.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/01-registers.gb")
 //+        let romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/dmg_sound/rom_singles/02-len ctr.gb")
@@ -58,16 +59,19 @@ struct Swift_BoyApp: App {
             
             let rom = try Data(contentsOf: romURL)
             let cartridge = try CartridgeHelper.loadROM(rom)
-            let boy = try SwiftBoy(cartridge: cartridge)
+            
+            display = EmulatorDisplay()
+            
+            let displayReference = display
+            
+            swiftBoy = try SwiftBoy(cartridge: cartridge, onFrame: {frame in
+                await displayReference.showFrame(frame)
+            })
 
-            // Save a reference
-            
-            swiftBoy = boy
-            
             // Start things running
             
-            backgroundTask = Task(priority: .userInitiated) {
-                await boy.run()
+            backgroundTask = Task(priority: .userInitiated) {[self] in
+                await swiftBoy.run()
             }
         } catch {
             fatalError(error.localizedDescription)

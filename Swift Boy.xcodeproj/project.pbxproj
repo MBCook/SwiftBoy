@@ -16,6 +16,7 @@
 		4C318A8829456141006F9377 /* NoMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8729456141006F9377 /* NoMapper.swift */; };
 		4C318A8A29467265006F9377 /* MBC1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8929467265006F9377 /* MBC1.swift */; };
 		4C318A8C2946B272006F9377 /* PPU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C318A8B2946B272006F9377 /* PPU.swift */; };
+		4C32BFF330902F9000B775B6 /* EmulatorDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C32BFF230902F9000B775B6 /* EmulatorDisplay.swift */; };
 		4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */; };
 		4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B942293C263800D4EEA0 /* SwiftBoyView.swift */; };
 		4C35B945293C263900D4EEA0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4C35B944293C263900D4EEA0 /* Assets.xcassets */; };
@@ -43,6 +44,7 @@
 		4C318A8729456141006F9377 /* NoMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoMapper.swift; sourceTree = "<group>"; };
 		4C318A8929467265006F9377 /* MBC1.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MBC1.swift; sourceTree = "<group>"; };
 		4C318A8B2946B272006F9377 /* PPU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PPU.swift; sourceTree = "<group>"; };
+		4C32BFF230902F9000B775B6 /* EmulatorDisplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmulatorDisplay.swift; sourceTree = "<group>"; };
 		4C35B93D293C263800D4EEA0 /* Swift Boy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Swift Boy.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		4C35B940293C263800D4EEA0 /* Swift_BoyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Swift_BoyApp.swift; sourceTree = "<group>"; };
 		4C35B942293C263800D4EEA0 /* SwiftBoyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftBoyView.swift; sourceTree = "<group>"; };
@@ -135,6 +137,7 @@
 				4C318A8229455292006F9377 /* CartridgeHelper.swift */,
 				4C35B951293C291600D4EEA0 /* CPU.swift */,
 				4C92EA13294D52F800412D30 /* DMAController.swift */,
+				4C32BFF230902F9000B775B6 /* EmulatorDisplay.swift */,
 				4C13DD4A2941622B00C8786C /* InterruptController.swift */,
 				4C4A820C295002D300D0ECBE /* Joypad.swift */,
 				4C35B953293C2AEF00D4EEA0 /* Memory.swift */,
@@ -249,6 +252,7 @@
 				4C92EA14294D52F800412D30 /* DMAController.swift in Sources */,
 				4CC3278A2B411105009074DD /* AudioChannel.swift in Sources */,
 				4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */,
+				4C32BFF330902F9000B775B6 /* EmulatorDisplay.swift in Sources */,
 				4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */,

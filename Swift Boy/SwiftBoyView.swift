@@ -8,11 +8,11 @@
 import SwiftUI
 
 struct SwiftBoyView: View {
-    @EnvironmentObject var swiftBoy: SwiftBoy
+    @EnvironmentObject var display: EmulatorDisplay
     
     var body: some View {
         VStack {
-            swiftBoy.screen
+            display.image
                 .antialiased(false)
                 .interpolation(.none)
                 .resizable()

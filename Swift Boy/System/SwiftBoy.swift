@@ -6,8 +6,6 @@
 //
 
 import Foundation
-import SwiftUI
-import Combine
 
 typealias Address = UInt16
 typealias Bitmask = UInt8
@@ -26,8 +24,7 @@ let FRAME_SAMPLE_COUNT = 60
 let NANOSECONDS_IN_SECOND: Double = 1_000_000_000
 let NANOSECONDS_IN_MILLISECOND: UInt64 = 1_000_000
 
-@MainActor
-class SwiftBoy: ObservableObject, @unchecked Sendable {
+actor SwiftBoy {
     // MARK: - Our private variables
     
     private var cpu: CPU
@@ -40,28 +37,24 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
     
     private var logFile: FileHandle?
     
-    private var screenCancellable: AnyCancellable!
-    
     private var ticksUsed: Ticks
     private var paused: Bool
     private var frameCounter: Int
     
     private var frameTimes: [TimeInterval]!
     
-    // MARK: - Our published variables
-    
-    @Published
-    var screen: Image!
+    private var onFrame: AsyncFrameCallback
     
     // MARK: - Our public interface
     
-    init(cartridge: Cartridge) throws {
+    init(cartridge: Cartridge, onFrame: @escaping AsyncFrameCallback) throws {
         // Mark that we haven't run any instructions yet or done anything
         
         ticksUsed = 0
         frameCounter = 0
         paused = false
         frameTimes = Array(repeating: 1, count: FRAME_SAMPLE_COUNT)
+        self.onFrame = onFrame
         
         // Create the various objects we need and wire them up
         
@@ -73,7 +66,11 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
         let dmaController = DMAController()
 
         apu.reset()
-        ppu = PPU(dmaController: dmaController)
+        ppu = PPU(dmaController: dmaController, onFrame: {frame in
+            Task {
+                await onFrame(frame)
+            }
+        })
         memory = Memory(cartridge: cartridge,
                         timer: timer,
                         interruptController: interruptController,
@@ -84,16 +81,6 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
         dmaController.setMemory(memory: memory)
         
         cpu = CPU(memory: memory, interruptController: interruptController)
-        
-        screen = renderFrame(nil)
-        
-        screenCancellable = ppu.$currentFrame.sink { [self] data in
-            let frame = renderFrame(data)
-            
-            DispatchQueue.main.async {
-                self.screen = frame
-            }
-        }
     }
     
     func pause() {
@@ -106,7 +93,7 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
         paused = false
     }
     
-    func reset() {
+    func reset() async {
         // Since we're starting again, no ticks have occurred
         
         ticksUsed = 0
@@ -124,10 +111,10 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
         memory.reset()
         cpu.reset()
         
-        screen = renderFrame(nil)
+        await onFrame(nil)  // To signal a screen reset
     }
     
-    func loadGameAndReset(_ cartridge: Cartridge) {
+    func loadGameAndReset(_ cartridge: Cartridge) async {
         // Since we're starting again, no ticks have occurred
         
         ticksUsed = 0
@@ -145,7 +132,7 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
         memory.loadGameAndReset(cartridge)
         cpu.reset()
         
-        screen = renderFrame(nil)
+        await onFrame(nil)  // To signal a screen reset
     }
     
     // The main runloop
@@ -276,37 +263,6 @@ class SwiftBoy: ObservableObject, @unchecked Sendable {
                     fatalError(error.localizedDescription)
                 } else {
                     fatalError("An unknown error occurred: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
-    
-    private func renderFrame(_ data: Data?) -> Image {
-        guard data != nil else {
-            return Image("Blank")
-        }
-        
-        // Ok, we've got stuff to render to an image
-        
-        return Image(size: CGSize(width: PIXELS_WIDE, height: PIXELS_TALL), opaque: true, colorMode: .nonLinear) { gc in
-            // Palette is called TU GBP Clean from https://github.com/trashuncle/Gameboy_Palettes
-            
-            let palette = [
-                CGColor(red: 0xF0 / 256.0, green: 0xFE / 256.0, blue: 0xF8 / 256.0, alpha: 1.0),    // White
-                CGColor(red: 0xB0 / 256.0, green: 0xC2 / 256.0, blue: 0xAD / 256.0, alpha: 1.0),    // Light
-                CGColor(red: 0x9B / 256.0, green: 0xA4 / 256.0, blue: 0x95 / 256.0, alpha: 1.0),    // Dark
-                CGColor(red: 0x37 / 256.0, green: 0x41 / 256.0, blue: 0x35 / 256.0, alpha: 1.0)     // Black
-            ]
-            
-            // Do the drawing
-            
-            gc.withCGContext { context in
-                for y in 0..<PIXELS_TALL {
-                    for x in 0..<PIXELS_WIDE {
-                        let start = y * PIXELS_WIDE
-                        context.setFillColor(palette[Int(data![start + x])])
-                        context.fill(CGRect(x: x, y: y, width: 1, height: 1))
-                    }
                 }
             }
         }
