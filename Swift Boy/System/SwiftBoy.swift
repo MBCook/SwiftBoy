@@ -14,6 +14,10 @@ typealias Register = UInt8
 typealias RegisterPair = UInt16
 typealias Ticks = UInt8             // A tick is 1 cycle at 2^20th HZ (~1 MHz), which is the length of the shortest CPU instruction (e.g. nop)
 typealias VolumeLevel = UInt8
+typealias SoundSample = Float32
+
+typealias AsyncFrameCallback = @Sendable (Data?) async -> Void
+typealias FrameCallback = @Sendable (Data?) -> Void
 
 let GAMEBOY_DOCTOR = false
 let BLARGG_TEST_ROMS = true

@@ -25,7 +25,7 @@ private enum SweepDirection {
     case subtraction
 }
 
-private let DUTY_CYCLES: Array<Array<Float16>> = [
+private let DUTY_CYCLES: Array<Array<SoundSample>> = [
     [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0],
     [-1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0],
     [-1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0],
@@ -46,7 +46,7 @@ class PulseWithPeriodSweep: AudioChannel {
     private var dutyCycle: Register = 0
     private var dutyStep: Register = 0
     private var firstCycleSinceRestart = true
-    private var lastDutyCycleAdjustedForVolume: Float16 = 0.0
+    private var lastDutyCycleAdjustedForVolume: SoundSample = 0.0
 
     private let lengthCounter: AudioLengthCounter
     
@@ -69,8 +69,8 @@ class PulseWithPeriodSweep: AudioChannel {
     
     private var channelSweeps = false
     
-    private var lastSample: Float16 = 0.0
-    private var impulseSinceLastSample: Float16 = 0.0
+    private var lastSample: SoundSample = 0.0
+    private var impulseSinceLastSample: SoundSample = 0.0
     
     var apu: APU? = nil
     
@@ -288,7 +288,7 @@ class PulseWithPeriodSweep: AudioChannel {
                 
                 // Adjust for volume
                 
-                newDutyCycleOutput *= Float16(actualVolume) / 16.0
+                newDutyCycleOutput *= SoundSample(actualVolume) / 16.0
                 
                 lastDutyCycleAdjustedForVolume = newDutyCycleOutput
                 
@@ -351,7 +351,7 @@ class PulseWithPeriodSweep: AudioChannel {
         }
     }
     
-    func collectSample() -> Float16 {
+    func collectSample() -> SoundSample {
         guard enabled else {
             return 0.0
         }

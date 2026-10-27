@@ -40,10 +40,10 @@ class WaveChannel: AudioChannel {
     
     private var wavePattern: [Register] = [Register](repeating: 0, count: 16)
     
-    private var lastWaveOutputAdjustedForVolume: Float16 = 0.0
+    private var lastWaveOutputAdjustedForVolume: SoundSample = 0.0
     
-    private var lastSample: Float16 = 0.0
-    private var impulseSinceLastSample: Float16 = 0.0
+    private var lastSample: SoundSample = 0.0
+    private var impulseSinceLastSample: SoundSample = 0.0
     
     var apu: APU? = nil
     
@@ -258,7 +258,7 @@ class WaveChannel: AudioChannel {
         // Not a feature, ignored
     }
     
-    func collectSample() -> Float16 {
+    func collectSample() -> SoundSample {
         guard enabled else {
             return 0.0
         }
@@ -272,7 +272,7 @@ class WaveChannel: AudioChannel {
     
     // MARK: - Channel specific functions
     
-    private func currentNibbleToSample() -> Float16 {
+    private func currentNibbleToSample() -> SoundSample {
         // First get the nibble
         
         var nibble = Int(wavePattern[Int(wavePatternNibble) / 2])
@@ -300,7 +300,7 @@ class WaveChannel: AudioChannel {
         // We have our value, now we need to turn it into our float range.
         // The values are stange. 0 means "1.0" and 15 means "-1.0".
         
-        var output = Float16(nibble) / 15.0     // 0 to 1.0 is 1.0 to -1.0
+        var output = SoundSample(nibble) / 15.0     // 0 to 1.0 is 1.0 to -1.0
         output = output * 2.0                   // 0 to 2.0 is 1.0 to -1.0
         output = output - 1.0                   // -1.0 to 1.0 is 1.0 to -1.0
         output *= -1.0                          // Finally correct

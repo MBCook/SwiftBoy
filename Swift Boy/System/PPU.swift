@@ -94,9 +94,6 @@ private typealias ColumnNumber = UInt8
 private typealias LineNumber = UInt8
 private typealias PixelCoordinate = Int16       // We have to deal with negative numbers and numbers over 127, so UInt8 and Int8 won't work
 
-typealias AsyncFrameCallback = @Sendable (Data?) async -> Void
-typealias FrameCallback = @Sendable (Data?) -> Void
-
 class PPU: MemoryMappedDevice {
     
     // MARK: - Our private data

@@ -18,7 +18,7 @@ class NoiseChannel: AudioChannel {
     private let lengthCounter: AudioLengthCounter
     
     private var lastNoiseBit: Bool = false
-    private var lastOutputAdjustedForVolume: Float16 = 0.0
+    private var lastOutputAdjustedForVolume: SoundSample = 0.0
     
     private var initialVolume: Register = 0
     private var actualVolume: Register = 0
@@ -41,10 +41,10 @@ class NoiseChannel: AudioChannel {
     private var lfsr: RegisterPair = 0
     
     private var firstCycleSinceRestart = true
-    private var lastNoiseAdjustedForVolume: Float16 = 0.0
+    private var lastNoiseAdjustedForVolume: SoundSample = 0.0
     
-    private var lastSample: Float16 = 0.0
-    private var impulseSinceLastSample: Float16 = 0.0
+    private var lastSample: SoundSample = 0.0
+    private var impulseSinceLastSample: SoundSample = 0.0
     
     var apu: APU? = nil
     
@@ -209,7 +209,7 @@ class NoiseChannel: AudioChannel {
                 
                 advanceNoise()
                 
-                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * Float16(actualVolume) / 15.0
+                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * SoundSample(actualVolume) / 15.0
                 
                 let impulseChange = newNoise - lastNoiseAdjustedForVolume
                 lastNoiseAdjustedForVolume = newNoise
@@ -220,7 +220,7 @@ class NoiseChannel: AudioChannel {
                 
                 volumeChanged = false
                 
-                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * Float16(actualVolume) / 15.0
+                let newNoise = (lastNoiseBit ? 1.0 : -1.0) * SoundSample(actualVolume) / 15.0
                 
                 let impulseChange = newNoise - lastNoiseAdjustedForVolume
                 lastNoiseAdjustedForVolume = newNoise
@@ -268,7 +268,7 @@ class NoiseChannel: AudioChannel {
         }
     }
 
-    func collectSample() -> Float16 {
+    func collectSample() -> SoundSample {
         guard enabled else {
             return 0.0
         }

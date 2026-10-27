@@ -56,26 +56,12 @@ private let SEVENTY_FIVE_DUTY_CYCLE: [VolumeLevel] = [0x0F, 0x00, 0x00, 0x00, 0x
 
 private let SAMPLE_RATE: Float = 44100.0
 private let SAMPLE_LENGTH: Float = 1.0 / SAMPLE_RATE    // How long one audio sample should be, in fractions of a second
+private let SAMPLE_COUNT = Int(SAMPLE_RATE) * 2
 private let CPU_FREQUENCY: Float = 4194304.0
 private let TICKS_PER_SECOND: Float = CPU_FREQUENCY / 4
 private let TICK_LENGTH: Float = 1.0 / TICKS_PER_SECOND
 private let TICKS_PER_SAMPLE = SAMPLE_LENGTH / TICK_LENGTH      // How many ticks are in each sample
-private let TWENTY_MS_OF_SAMPLES = Int(0.02 * SAMPLE_LENGTH)    // How many elements is 20ms worth of samples?
-
-class APUSamples {
-    private var leftChannelSamples: Array<Float16> = Array()
-    private var rightChannelSamples: Array<Float16> = Array()
-    
-    init() {
-        leftChannelSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
-        rightChannelSamples.reserveCapacity(TWENTY_MS_OF_SAMPLES)
-    }
-    
-    func addSample(left: Float16, right: Float16) {
-        leftChannelSamples.append(left)
-        rightChannelSamples.append(right)
-    }
-}
+private let TWENTY_MS_OF_SAMPLES = Int(0.02 / SAMPLE_LENGTH)    // How many elements is 20ms worth of samples?
 
 class APU: MemoryMappedDevice {
     // MARK: - Private variables
@@ -87,7 +73,10 @@ class APU: MemoryMappedDevice {
     var channelThree: WaveChannel = WaveChannel()
     var channelFour: NoiseChannel = NoiseChannel()
     
-    private let samples: Mutex<APUSamples> = Mutex.init(APUSamples())
+    private var samples: UnsafeMutablePointer<SoundSample>
+    
+    private let sampleReader = Atomic<Int>(0)
+    private let sampleWriter = Atomic<Int>(TWENTY_MS_OF_SAMPLES * 2)  // Start a bit in to give us some buffer 0.0s
     
     private let channels: [AudioChannel]
     
@@ -159,15 +148,23 @@ class APU: MemoryMappedDevice {
         }
     }
     
-    // MARK: - Constructor
+    // MARK: - Constructor/destructor
     
     init() {
         channels = [channelOne, channelTwo, channelThree, channelFour]
+        
+        samples = .allocate(capacity: SAMPLE_COUNT)
+        samples.initialize(repeating: 0.0, count: SAMPLE_COUNT)
         
         channelOne.apu = self
         channelTwo.apu = self
         channelThree.apu = self
         channelFour.apu = self
+    }
+    
+    deinit {
+        samples.deinitialize(count: SAMPLE_COUNT)
+        samples.deallocate()
     }
     
     // MARK: - Public functions
@@ -225,6 +222,78 @@ class APU: MemoryMappedDevice {
         return frameSequencer % 2 != 0
     }
     
+    func collectAudio(into destination: UnsafeMutableBufferPointer<Float>, frameCount: Int) -> Int {
+        // Local copies so we don't have to mess with atomics constantly
+        
+        let readPointer = sampleReader.load(ordering: .acquiring)
+        let writePointer = sampleWriter.load(ordering: .acquiring)
+        
+        // Figure out how many samples we have.
+        let samplesReady = ((writePointer - readPointer) + (writePointer < readPointer ? SAMPLE_COUNT : 0)) / 2
+        let wrapped = (writePointer < readPointer) && (readPointer + frameCount * 2 > SAMPLE_COUNT)
+        
+        // Copy what we have
+        
+        if !wrapped {
+            if samplesReady >= frameCount {
+                let sourceStart = samples.advanced(by: readPointer)
+                destination.baseAddress!.update(from: sourceStart, count: frameCount * 2)
+                
+                // If samplesReady == frameCount it's possible to end up RIGHT PAST THE END of the array. So wrap.
+                sampleReader.store((readPointer + 2 * frameCount) % SAMPLE_COUNT, ordering: .releasing)
+            } else {
+                // We're short, copy what we have, fill the rest with 0.0
+                
+                let sourceStart = samples.advanced(by: readPointer)
+                destination.baseAddress!.update(from: sourceStart, count: samplesReady * 2)
+                destination.baseAddress!.update(repeating: 0.0, count: (frameCount - samplesReady) * 2)
+                
+                // If the writer is ahead of us, we don't need to worry about wrapping
+                sampleReader.add(2 * samplesReady, ordering: .releasing)
+            }
+        } else {
+            // Oh goody, this is harder
+            
+            let runOne = SAMPLE_COUNT - readPointer   // Both in array elements, not samples
+            let runTwo = frameCount * 2 - runOne
+            
+            if samplesReady >= frameCount {
+                let runOneStart = samples.advanced(by: readPointer)
+                let runTwoStart = samples.advanced(by: 0)
+                destination.baseAddress!.update(from: runOneStart, count: runOne)
+                destination.baseAddress!.update(from: runTwoStart, count: runTwo)
+                
+                sampleReader.store((readPointer + 2 * frameCount) % SAMPLE_COUNT, ordering: .releasing)
+            } else {
+                // We're short, copy what we have, fill the rest with 0.0
+                
+                if runOne > samplesReady * 2 {
+                    // Easiest case, between us and the end of the array is everything we have
+                    
+                    let sourceStart = samples.advanced(by: readPointer)
+                    destination.baseAddress!.update(from: sourceStart, count: samplesReady * 2)
+                    destination.baseAddress!.update(repeating: 0.0, count: (frameCount - samplesReady) * 2)
+
+                    // We didn't make it to the end, don't worry about wrapping
+                    sampleReader.add(2 * samplesReady, ordering: .releasing)
+                } else {
+                    // Harder case, between us and the end of the array is OK, the rest is too short
+                    
+                    let runOneStart = samples.advanced(by: readPointer)
+                    let runTwoStart = samples.advanced(by: 0)
+                    
+                    destination.baseAddress!.update(from: runOneStart, count: runOne)
+                    destination.baseAddress!.update(from: runTwoStart, count: samplesReady * 2 - runOne)
+                    destination.baseAddress!.update(repeating: 0.0, count: (frameCount - samplesReady) * 2)
+                    
+                    sampleReader.store((readPointer + 2 * samplesReady) % SAMPLE_COUNT, ordering: .releasing)
+                }
+            }
+        }
+        
+        return frameCount
+    }
+    
     // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
@@ -234,66 +303,81 @@ class APU: MemoryMappedDevice {
         
         // Is it time to get a new sample from the channels?
         
-//        ticksSinceLastSample += Float(ticks)
-//        
-//        if ticksSinceLastSample > TICKS_PER_SAMPLE {
-//            ticksSinceLastSample -= TICKS_PER_SAMPLE
-//                        
-//            let channelOneSample = channelOne.collectSample()
-//            let channelTwoSample = channelTwo.collectSample()
-//            let channelThreeSample = channelThree.collectSample()
-//            let channelFourSample = channelFour.collectSample()
-//            
-//            var leftSample: Float16 = 0.0
-//            var rightSample: Float16 = 0.0
-//            
-//            // Ok merge things the way the APU does
-//            
-//            if apuEnabled {
-//                // Use the panning register to put things in the right places
-//                
-//                if soundPanningRegister & 0x80 > 0 {
-//                    leftSample += channelFourSample
-//                }
-//                if soundPanningRegister & 0x40 > 0 {
-//                    leftSample += channelThreeSample
-//                }
-//                if soundPanningRegister & 0x20 > 0 {
-//                    leftSample += channelTwoSample
-//                }
-//                if soundPanningRegister & 0x10 > 0 {
-//                    leftSample += channelOneSample
-//                }
-//                if soundPanningRegister & 0x08 > 0 {
-//                    rightSample += channelFourSample
-//                }
-//                if soundPanningRegister & 0x04 > 0 {
-//                    rightSample += channelThreeSample
-//                }
-//                if soundPanningRegister & 0x02 > 0 {
-//                    rightSample += channelTwoSample
-//                }
-//                if soundPanningRegister & 0x01 > 0 {
-//                    rightSample += channelOneSample
-//                }
-//                
-//                // Normalize
-//                
-//                leftSample /= 4.0
-//                rightSample /= 4.0
-//                
-//                // Adjust for volume
-//                
-//                leftSample *= (Float16(leftVolume) + 1.0) / 8.0
-//                rightSample *= (Float16(rightVolume) + 1.0) / 8.0
-//                
-//                // Store them
-//                
-//                samples.withLock {
-//                    $0.addSample(left: leftSample, right: rightSample)
-//                }
-//            }
-//        }
+        ticksSinceLastSample += Float(ticks)
+        
+        if ticksSinceLastSample > TICKS_PER_SAMPLE {
+            ticksSinceLastSample -= TICKS_PER_SAMPLE
+                        
+            let channelOneSample = channelOne.collectSample()
+            let channelTwoSample = channelTwo.collectSample()
+            let channelThreeSample = channelThree.collectSample()
+            let channelFourSample = channelFour.collectSample()
+            
+            var leftSample: SoundSample = 0.0
+            var rightSample: SoundSample = 0.0
+            
+            // Ok merge things the way the APU does
+            
+            if apuEnabled {
+                // Use the panning register to put things in the right places
+                
+                if soundPanningRegister & 0x80 > 0 {
+                    leftSample += channelFourSample
+                }
+                if soundPanningRegister & 0x40 > 0 {
+                    leftSample += channelThreeSample
+                }
+                if soundPanningRegister & 0x20 > 0 {
+                    leftSample += channelTwoSample
+                }
+                if soundPanningRegister & 0x10 > 0 {
+                    leftSample += channelOneSample
+                }
+                if soundPanningRegister & 0x08 > 0 {
+                    rightSample += channelFourSample
+                }
+                if soundPanningRegister & 0x04 > 0 {
+                    rightSample += channelThreeSample
+                }
+                if soundPanningRegister & 0x02 > 0 {
+                    rightSample += channelTwoSample
+                }
+                if soundPanningRegister & 0x01 > 0 {
+                    rightSample += channelOneSample
+                }
+                
+                // Normalize
+                
+                leftSample /= 4.0
+                rightSample /= 4.0
+                
+                // Adjust for volume
+                
+                leftSample *= (SoundSample(leftVolume) + 1.0) / 8.0
+                rightSample *= (SoundSample(rightVolume) + 1.0) / 8.0
+                
+                // Ensure we have space
+                
+                let reader = sampleReader.load(ordering: .acquiring)
+                let current = sampleWriter.load(ordering: .acquiring)
+                let nextWrite = (current + 2) % SAMPLE_COUNT
+                
+                guard nextWrite != reader else {
+                    // We want to maintain at least one element between the writer and the reader.
+                    // Otherwise we can't tell full (current = reader, we caught up to them) from
+                    // when things are empty (current = reader, they caught up to us)
+                    
+                    return
+                }
+                
+                // Store them, left first
+                
+                samples[current] = leftSample
+                samples[current + 1] = rightSample
+                
+                sampleWriter.store(nextWrite, ordering: .releasing)
+            }
+        }
     }
     
     func divTick() {
