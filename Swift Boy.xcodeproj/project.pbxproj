@@ -25,6 +25,7 @@
 		4C35B954293C2AEF00D4EEA0 /* Memory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C35B953293C2AEF00D4EEA0 /* Memory.swift */; };
 		4C4A820D295002D300D0ECBE /* Joypad.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C4A820C295002D300D0ECBE /* Joypad.swift */; };
 		4C4A8211295144D400D0ECBE /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C4A8210295144D400D0ECBE /* GameController.framework */; };
+		4C700DF830916B6600D19E01 /* AudioOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C700DF730916B6600D19E01 /* AudioOutput.swift */; };
 		4C92EA14294D52F800412D30 /* DMAController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C92EA13294D52F800412D30 /* DMAController.swift */; };
 		4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC3277E2B3B5AD0009074DD /* APU.swift */; };
 		4CC327822B3CB4B8009074DD /* PulseWithPeriodSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */; };
@@ -57,6 +58,7 @@
 		4C4A820C295002D300D0ECBE /* Joypad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Joypad.swift; sourceTree = "<group>"; };
 		4C4A820E295144CA00D0ECBE /* Swift-Boy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Swift-Boy-Info.plist"; sourceTree = SOURCE_ROOT; };
 		4C4A8210295144D400D0ECBE /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
+		4C700DF730916B6600D19E01 /* AudioOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutput.swift; sourceTree = "<group>"; };
 		4C92EA13294D52F800412D30 /* DMAController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMAController.swift; sourceTree = "<group>"; };
 		4CC3277E2B3B5AD0009074DD /* APU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APU.swift; sourceTree = "<group>"; };
 		4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseWithPeriodSweep.swift; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				4CC327802B3CB489009074DD /* Audio */,
 				4C318A8629455C3F006F9377 /* Mappers */,
 				4CC3277E2B3B5AD0009074DD /* APU.swift */,
+				4C700DF730916B6600D19E01 /* AudioOutput.swift */,
 				4C318A8229455292006F9377 /* CartridgeHelper.swift */,
 				4C35B951293C291600D4EEA0 /* CPU.swift */,
 				4C92EA13294D52F800412D30 /* DMAController.swift */,
@@ -256,6 +259,7 @@
 				4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */,
+				4C700DF830916B6600D19E01 /* AudioOutput.swift in Sources */,
 				4C318A8A29467265006F9377 /* MBC1.swift in Sources */,
 				4C318A8C2946B272006F9377 /* PPU.swift in Sources */,
 				4C35B941293C263800D4EEA0 /* Swift_BoyApp.swift in Sources */,

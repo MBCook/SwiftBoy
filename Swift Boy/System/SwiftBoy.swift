@@ -182,16 +182,17 @@ actor SwiftBoy {
             if frameIntervalSeconds < CORRECT_FRAME_TIME_SECONDS {
                 let delayNanoseconds = UInt64((CORRECT_FRAME_TIME_SECONDS - frameIntervalSeconds) * NANOSECONDS_IN_SECOND)
                 
-                // The extra millisecond we take off gets us to almost exactly 60 FPs
-                try! await Task.sleep(nanoseconds: delayNanoseconds - NANOSECONDS_IN_MILLISECOND)
+                // Sleep for the remaining frame time. Subtracting a fixed millisecond can underflow
+                // when less than one millisecond remains.
+                try? await Task.sleep(nanoseconds: delayNanoseconds)
                 
                 frameIntervalSeconds = Date.now.timeIntervalSince(frameStart)  // If we were running too fast, include the sleep
             }
             
             frameCounter &+= 1
             
-            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameIntervalSeconds
-            
+//            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameIntervalSeconds
+//            
 //            if frameCounter % 60 == 0 {
 //                printFrameStats()
 //            }

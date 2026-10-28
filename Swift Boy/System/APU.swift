@@ -94,6 +94,8 @@ class APU: MemoryMappedDevice {
     
     private var lastAPUStatus: Register?
     
+    private var audioOutput: AudioOutput? = nil
+    
     // MARK: - Registers
     
     private var audioControlRegister: Register {
@@ -160,6 +162,8 @@ class APU: MemoryMappedDevice {
         channelTwo.apu = self
         channelThree.apu = self
         channelFour.apu = self
+        
+        audioOutput = AudioOutput(apu: self)
     }
     
     deinit {
@@ -188,7 +192,7 @@ class APU: MemoryMappedDevice {
         
         apuEnabled = true
         
-        // TODO: Other stuff?
+        audioOutput?.start()
     }
     
     func disableAPU() {
@@ -197,6 +201,8 @@ class APU: MemoryMappedDevice {
         }
         
         // TODO: Clear stuff when this is turned off, see PAN docs
+        
+        audioOutput?.stop()
         
         // Clear all registers but the master control register
         
@@ -222,7 +228,7 @@ class APU: MemoryMappedDevice {
         return frameSequencer % 2 != 0
     }
     
-    func collectAudio(into destination: UnsafeMutableBufferPointer<Float>, frameCount: Int) -> Int {
+    func collectAudio(into destination: UnsafeMutableBufferPointer<Float>, frameCount: Int) {
         // Local copies so we don't have to mess with atomics constantly
         
         let readPointer = sampleReader.load(ordering: .acquiring)
@@ -290,8 +296,6 @@ class APU: MemoryMappedDevice {
                 }
             }
         }
-        
-        return frameCount
     }
     
     // MARK: - Tick functions
