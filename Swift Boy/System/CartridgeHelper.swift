@@ -17,14 +17,14 @@ enum CartridgeErrors: Error {
 extension CartridgeErrors: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case let .BadROMSize(expected, found):
-            return "Bad ROM size found. It was \(found) when we expected it to be \(expected) bytes."
-        case let .UnsupportedCartridgeType(type):
-            return "Unsupported mapper type on cartridge: 0x\(toHex(type))"
-        case let .UnsupportedROMSize(code):
-            return "Unsupported ROM size code on cartridge: 0x\(toHex(code))"
-        case let .UnsupportedRAMSize(code):
-            return "Unsupported RAM size code on cartridge: 0x\(toHex(code))"
+            case let .BadROMSize(expected, found):
+                return "Bad ROM size found. It was \(found) when we expected it to be \(expected) bytes."
+            case let .UnsupportedCartridgeType(type):
+                return "Unsupported mapper type on cartridge: 0x\(toHex(type))"
+            case let .UnsupportedROMSize(code):
+                return "Unsupported ROM size code on cartridge: 0x\(toHex(code))"
+            case let .UnsupportedRAMSize(code):
+                return "Unsupported RAM size code on cartridge: 0x\(toHex(code))"
         }
     }
 }
@@ -58,12 +58,18 @@ class CartridgeHelper {
         var cartridge: Cartridge.Type
         
         switch type {
-        case 0x00:
-            cartridge = NoMapper.self
-        case 0x01, 0x02, 0x03:          // TODO: We're ignoring the battery on 0x03! Oh no!
-            cartridge = MBC1.self
-        default:
-            throw CartridgeErrors.UnsupportedCartridgeType(type)
+            case 0x00:
+                cartridge = NoMapper.self
+            case 0x01, 0x02, 0x03:          // TODO: We're ignoring the battery on 0x03! Oh no!
+                cartridge = MBC1.self
+            case 0x05, 0x06:                // TODO: And 0x06! Oh no!
+                cartridge = MBC2.self
+            case 0x0F, 0x10, 0x11, 0x12, 0x13:  // TODO: And 0x10 and 0x13, ignoring clock on 0x0F and 0x10
+                cartridge = MBC3.self
+            case 0x19, 0x1A, 0x1B:          // TODO: Ignoring battery again on 0x1B
+                cartridge = MBC5.self
+            default:
+                throw CartridgeErrors.UnsupportedCartridgeType(type)
         }
         
         // Check with the mapper to see that the size is sane for that mapper
@@ -95,18 +101,18 @@ class CartridgeHelper {
     
     private static func findRAMSize(_ size: UInt8) throws -> UInt32 {
         switch size {
-        case 0x00:
-            return 0        // None
-        case 0x02:
-            return 0x2000   // 8 Kb
-        case 0x03:
-            return 0x8000   // 32 Kb
-        case 0x04:
-            return 0x20000  // 128 Kb
-        case 0x05:
-            return 0x10000  // 64 Kb
-        default:
-            throw CartridgeErrors.UnsupportedROMSize(size)
+            case 0x00:
+                return 0        // None
+            case 0x02:
+                return 0x2000   // 8 Kb
+            case 0x03:
+                return 0x8000   // 32 Kb
+            case 0x04:
+                return 0x20000  // 128 Kb
+            case 0x05:
+                return 0x10000  // 64 Kb
+            default:
+                throw CartridgeErrors.UnsupportedROMSize(size)
         }
     }
 }

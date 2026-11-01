@@ -69,7 +69,7 @@ class MBC1: Cartridge {
     
     static func sanityCheckSizes(romSize: UInt32, ramSize: UInt32) -> (Bool, Bool) {
         let romGood = romSize <= TWO_MB     // Gotta be 2 MB or less, only four RAM options
-        let ramGood = ramSize == 0 || ramSize == TWO_KB || ramSize == EIGHT_KB || ramSize == THIRTY_TWO_KB  // Only valid sizes
+        let ramGood = ramSize <= THIRTY_TWO_KB && ramSize != SIXTEEN_KB  // Only valid sizes
         
         return (romGood, ramGood)
     }
@@ -94,33 +94,33 @@ class MBC1: Cartridge {
     
     func writeToROM(_ address: Address, _ value: UInt8) {
         switch address {
-        case 0x0000...0x1FFF:
-            // Controls if RAM is enabled or not (we'll ignore it if there is no RAM)
-            
-            if totalRAM > 0 {
-                ramEnabled = value & 0x0F == 0x0A   // Lower nibble has to be A for some reason in the GB hardware
-            }
-        case 0x2000...0x3FFF:
-            // Set ROM bank number
-            let fiveBit = value & 0b00011111    // We only want the lower 5 bits
-            
-            // You can't select bank 0, you get one if you try
-            
-            romBank = value == 0 ? 1 : fiveBit
-            
-            // Always add in the high bits if that mode is turned on
-            
-            romBank += (addressMode == .romMode ? ramBank << 5 : 0)
-        case 0x4000...0x5FFF:
-            // Set the two bits for the RAM bank or upper ROM bank select bits
-            
-            ramBank = value & 0x03
-        case 0x6000...0x7FFF:
-            // Banking mode select
-            
-            bankingMode = value & 0x01 == 0x01 ? .advanced : .simple
-        default:
-            fatalError("Cartridge should not have been given address 0x\(toHex(address)) to write to")
+            case 0x0000...0x1FFF:
+                // Controls if RAM is enabled or not (we'll ignore it if there is no RAM)
+                
+                if totalRAM > 0 {
+                    ramEnabled = value & 0x0F == 0x0A   // Lower nibble has to be A for some reason in the GB hardware
+                }
+            case 0x2000...0x3FFF:
+                // Set ROM bank number
+                let fiveBit = value & 0b00011111    // We only want the lower 5 bits
+                
+                // You can't select bank 0, you get one if you try
+                
+                romBank = value == 0 ? 1 : fiveBit
+                
+                // Always add in the high bits if that mode is turned on
+                
+                romBank += (addressMode == .romMode ? ramBank << 5 : 0)
+            case 0x4000...0x5FFF:
+                // Set the two bits for the RAM bank or upper ROM bank select bits
+                
+                ramBank = value & 0x03
+            case 0x6000...0x7FFF:
+                // Banking mode select
+                
+                bankingMode = value & 0x01 == 0x01 ? .advanced : .simple
+            default:
+                fatalError("Cartridge should not have been given address 0x\(toHex(address)) to write to")
         }
     }
     

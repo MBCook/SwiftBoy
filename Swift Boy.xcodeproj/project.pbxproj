@@ -27,6 +27,9 @@
 		4C4A8211295144D400D0ECBE /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C4A8210295144D400D0ECBE /* GameController.framework */; };
 		4C700DF830916B6600D19E01 /* AudioOutput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C700DF730916B6600D19E01 /* AudioOutput.swift */; };
 		4C92EA14294D52F800412D30 /* DMAController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C92EA13294D52F800412D30 /* DMAController.swift */; };
+		4CA4FF463097F982000A6DD5 /* MBC2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA4FF453097F982000A6DD5 /* MBC2.swift */; };
+		4CA4FF483097FEB1000A6DD5 /* MBC3.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA4FF473097FEB1000A6DD5 /* MBC3.swift */; };
+		4CA4FF4A30980096000A6DD5 /* MBC5.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CA4FF4930980096000A6DD5 /* MBC5.swift */; };
 		4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC3277E2B3B5AD0009074DD /* APU.swift */; };
 		4CC327822B3CB4B8009074DD /* PulseWithPeriodSweep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */; };
 		4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC327832B3CE4C7009074DD /* NoiseChannel.swift */; };
@@ -60,6 +63,9 @@
 		4C4A8210295144D400D0ECBE /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		4C700DF730916B6600D19E01 /* AudioOutput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioOutput.swift; sourceTree = "<group>"; };
 		4C92EA13294D52F800412D30 /* DMAController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMAController.swift; sourceTree = "<group>"; };
+		4CA4FF453097F982000A6DD5 /* MBC2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBC2.swift; sourceTree = "<group>"; };
+		4CA4FF473097FEB1000A6DD5 /* MBC3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBC3.swift; sourceTree = "<group>"; };
+		4CA4FF4930980096000A6DD5 /* MBC5.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBC5.swift; sourceTree = "<group>"; };
 		4CC3277E2B3B5AD0009074DD /* APU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APU.swift; sourceTree = "<group>"; };
 		4CC327812B3CB4B8009074DD /* PulseWithPeriodSweep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseWithPeriodSweep.swift; sourceTree = "<group>"; };
 		4CC327832B3CE4C7009074DD /* NoiseChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoiseChannel.swift; sourceTree = "<group>"; };
@@ -85,6 +91,9 @@
 			children = (
 				4C318A8429455B84006F9377 /* Cartridge.swift */,
 				4C318A8929467265006F9377 /* MBC1.swift */,
+				4CA4FF453097F982000A6DD5 /* MBC2.swift */,
+				4CA4FF473097FEB1000A6DD5 /* MBC3.swift */,
+				4CA4FF4930980096000A6DD5 /* MBC5.swift */,
 				4C318A8729456141006F9377 /* NoMapper.swift */,
 			);
 			path = Mappers;
@@ -248,6 +257,7 @@
 				4C4A820D295002D300D0ECBE /* Joypad.swift in Sources */,
 				4C318A8329455292006F9377 /* CartridgeHelper.swift in Sources */,
 				4C13DD4F29416BD800C8786C /* Utility.swift in Sources */,
+				4CA4FF4A30980096000A6DD5 /* MBC5.swift in Sources */,
 				4CC327822B3CB4B8009074DD /* PulseWithPeriodSweep.swift in Sources */,
 				4C318A8529455B84006F9377 /* Cartridge.swift in Sources */,
 				4CC327882B410AAA009074DD /* AudioLengthCounter.swift in Sources */,
@@ -256,9 +266,11 @@
 				4CC3278A2B411105009074DD /* AudioChannel.swift in Sources */,
 				4CC3277F2B3B5AD0009074DD /* APU.swift in Sources */,
 				4C32BFF330902F9000B775B6 /* EmulatorDisplay.swift in Sources */,
+				4CA4FF483097FEB1000A6DD5 /* MBC3.swift in Sources */,
 				4C35B943293C263800D4EEA0 /* SwiftBoyView.swift in Sources */,
 				4C13DD4B2941622B00C8786C /* InterruptController.swift in Sources */,
 				4CC327842B3CE4C7009074DD /* NoiseChannel.swift in Sources */,
+				4CA4FF463097F982000A6DD5 /* MBC2.swift in Sources */,
 				4C700DF830916B6600D19E01 /* AudioOutput.swift in Sources */,
 				4C318A8A29467265006F9377 /* MBC1.swift in Sources */,
 				4C318A8C2946B272006F9377 /* PPU.swift in Sources */,
