@@ -23,7 +23,7 @@ let GAMEBOY_DOCTOR = false
 let BLARGG_TEST_ROMS = true
 let CONSOLE_DISPLAY = false
 
-let CORRECT_FRAME_TIME_SECONDS = 1.0 / 60.0     // Aim for 60 frames per second
+let CORRECT_FRAME_TIME_IN_NANOSECONDS = 1.0 / 60.0 * NANOSECONDS_IN_SECOND
 let FRAME_SAMPLE_COUNT = 60
 let NANOSECONDS_IN_SECOND: Double = 1_000_000_000
 let NANOSECONDS_IN_MILLISECOND: UInt64 = 1_000_000
@@ -48,6 +48,10 @@ actor SwiftBoy {
     private var frameTimes: [TimeInterval]!
     
     private var onFrame: AsyncFrameCallback
+    
+    private let clock = ContinuousClock()
+    private let framePeriod = Duration.nanoseconds(CORRECT_FRAME_TIME_IN_NANOSECONDS)
+    private var nextFrameStart: ContinuousClock.Instant!
     
     // MARK: - Our public interface
     
@@ -172,30 +176,36 @@ actor SwiftBoy {
         
         print("Starting")
         
+        nextFrameStart = clock.now
+        
         while !paused {
-            let frameStart = Date.now
+            // Use up spare time, if there is any
+            try? await clock.sleep(until: nextFrameStart, tolerance: .microseconds(200))
             
+            let start = clock.now
             runForOneFrame()
+            let end = clock.now
             
-            var frameIntervalSeconds = Date.now.timeIntervalSince(frameStart)  // Seconds since the frame started
+            // Record the next time a frame should start
+            nextFrameStart += framePeriod
+
+            // If we missed the deadline, just move the deadline up to now
+            let now = clock.now
             
-            if frameIntervalSeconds < CORRECT_FRAME_TIME_SECONDS {
-                let delayNanoseconds = UInt64((CORRECT_FRAME_TIME_SECONDS - frameIntervalSeconds) * NANOSECONDS_IN_SECOND)
-                
-                // Sleep for the remaining frame time. Subtracting a fixed millisecond can underflow
-                // when less than one millisecond remains.
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
-                
-                frameIntervalSeconds = Date.now.timeIntervalSince(frameStart)  // If we were running too fast, include the sleep
+            if now > nextFrameStart {
+                nextFrameStart = now
             }
             
             frameCounter &+= 1
             
-//            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameIntervalSeconds
-//            
-//            if frameCounter % 60 == 0 {
-//                printFrameStats()
-//            }
+            let timeUsed = start.duration(to: end)
+            let frameTime = Double(timeUsed.components.seconds) + Double(timeUsed.components.attoseconds) / Double(1e18)
+            
+            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameTime
+            
+            if frameCounter % 60 == 0 {
+                printFrameStats()
+            }
         }
     }
     
@@ -204,13 +214,15 @@ actor SwiftBoy {
     private func printFrameStats() {
         let frameTimeSum = frameTimes.reduce(0, +)
         let frameTimeAverage = frameTimeSum / Double(FRAME_SAMPLE_COUNT)
-        let minimumTime = frameTimes.min()! / frameTimeAverage * 100
-        let maximumTime = frameTimes.max()! / frameTimeAverage * 100
+        let minimumTime = frameTimes.min()!
+        let maximumTime = frameTimes.max()!
         
         let fps = 1 / (frameTimeSum / Double(FRAME_SAMPLE_COUNT))
         let averageFrameTimeMS = frameTimeAverage * 1000
+        let minimumFrameTimeMS = minimumTime * 1000
+        let maximumFrameTimeMS = maximumTime * 1000
         
-        print(String(format: "FPS: %.2f, Time: %.2fms, Min: %.2f%%, Max: %.2f%%", fps, averageFrameTimeMS, minimumTime, maximumTime))
+        print(String(format: "FPS: %.2f, Time: %.2fms, Min: %.2fms, Max: %.2fms", fps, averageFrameTimeMS, minimumFrameTimeMS, maximumFrameTimeMS))
     }
     
     private func runForOneFrame() {

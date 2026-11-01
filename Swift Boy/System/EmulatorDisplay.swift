@@ -22,24 +22,47 @@ final class EmulatorDisplay: ObservableObject {
 
         image = Image(size: CGSize(width: PIXELS_WIDE, height: PIXELS_TALL), opaque: true, colorMode: .nonLinear) { gc in
             // Palette is called TU GBP Clean from https://github.com/trashuncle/Gameboy_Palettes
-
-            let palette = [
-                CGColor(red: 0xF0 / 256.0, green: 0xFE / 256.0, blue: 0xF8 / 256.0, alpha: 1.0),    // White
-                CGColor(red: 0xB0 / 256.0, green: 0xC2 / 256.0, blue: 0xAD / 256.0, alpha: 1.0),    // Light
-                CGColor(red: 0x9B / 256.0, green: 0xA4 / 256.0, blue: 0x95 / 256.0, alpha: 1.0),    // Dark
-                CGColor(red: 0x37 / 256.0, green: 0x41 / 256.0, blue: 0x35 / 256.0, alpha: 1.0)     // Black
-            ]
-
+            // Colors are in order of white, light, dark, black
+            
+            let reds: [UInt8] = [0xF0, 0xB0, 0x9B, 0x37]
+            let greens: [UInt8] = [0xFE, 0xC2, 0xA4, 0x41]
+            let blues: [UInt8] = [0xF8, 0xAD, 0x95, 0x35]
+            
             // Do the drawing
 
-            gc.withCGContext { context in
-                for y in 0..<PIXELS_TALL {
-                    for x in 0..<PIXELS_WIDE {
-                        let start = y * PIXELS_WIDE
-                        context.setFillColor(palette[Int(frame![start + x])])
-                        context.fill(CGRect(x: x, y: y, width: 1, height: 1))
-                    }
+            let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: PIXELS_WIDE,
+                pixelsHigh: PIXELS_TALL,
+                bitsPerSample: 8,
+                samplesPerPixel: 3,
+                hasAlpha: false,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 3 * PIXELS_WIDE,
+                bitsPerPixel: 24
+            )!
+            
+            var destination = bitmap.bitmapData!
+            
+            frame!.withUnsafeBytes { source in
+                for i in 0..<PIXELS_TALL * PIXELS_WIDE {
+                    let color = Int(frame![i])
+                    
+                    destination.pointee = reds[color]
+                    destination = destination.advanced(by: 1)
+                    destination.pointee = greens[color]
+                    destination = destination.advanced(by: 1)
+                    destination.pointee = blues[color]
+                    destination = destination.advanced(by: 1)
                 }
+            }
+            
+            gc.withCGContext { context in
+                context.interpolationQuality = .none
+                context.translateBy(x: 0, y: CGFloat(PIXELS_TALL))
+                context.scaleBy(x: 1, y: -1)
+                context.draw(bitmap.cgImage!, in: CGRect(x: 0, y: 0, width: PIXELS_WIDE, height: PIXELS_TALL))
             }
         }
     }
