@@ -98,17 +98,17 @@ class Timer: MemoryMappedDevice {
         let divisor: UInt16
         
         switch timerControl & CLOCK_DIVISOR_MASK {
-        case TimerControlBits.clockDivIs1024:
-            divisor = 256
-        case TimerControlBits.clockDivIs16:
-            divisor = 4
-        case TimerControlBits.clockDivIs64:
-            divisor = 16
-        case TimerControlBits.clockDivIs256:
-            divisor = 64
-        default:
-            // Xcode can't seem to figure out we have all possible cases of 2 bits
-            fatalError("Unable to find a case for time control value 0x\(toHex(timerControl))!")
+            case TimerControlBits.clockDivIs1024:
+                divisor = 256
+            case TimerControlBits.clockDivIs16:
+                divisor = 4
+            case TimerControlBits.clockDivIs64:
+                divisor = 16
+            case TimerControlBits.clockDivIs256:
+                divisor = 64
+            default:
+                // Xcode can't seem to figure out we have all possible cases of 2 bits
+                fatalError("Unable to find a case for time control value 0x\(toHex(timerControl))!")
         }
         
         // See if we need to increment the timer
@@ -146,16 +146,16 @@ class Timer: MemoryMappedDevice {
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
-        case DIV_REGISTER:
-            return divRegister
-        case TIMER_COUNTER_REGISTER:
-            return timerCounter
-        case TIME_MODULO_REGISTER:
-            return timerModulo
-        case TIMER_CONTROL_REGISTER:
-            return timerControl
-        default:
-            fatalError("The timer should not have been asked for memory address 0x\(toHex(address))")
+            case DIV_REGISTER:
+                return divRegister
+            case TIMER_COUNTER_REGISTER:
+                return timerCounter
+            case TIME_MODULO_REGISTER:
+                return timerModulo
+            case TIMER_CONTROL_REGISTER:
+                return timerControl
+            default:
+                fatalError("The timer should not have been asked for memory address 0x\(toHex(address))")
         }
     }
     

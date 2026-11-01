@@ -7,11 +7,18 @@
 
 import Foundation
 
-let TWO_KB: UInt32 = 0x2000
+let TWO_KB: UInt32 = 0x0800
 let EIGHT_KB: UInt32 = 0x2000
+let SIXTEEN_KB: UInt32 = 0x4000
 let THIRTY_TWO_KB: UInt32 = 0x8000
+let SIXTY_FOUR_KB: UInt32 = 0x10000
+let ONE_HUNDRED_TWENTY_EIGHT_KB: UInt32 = 0x20000
+let TWO_HUNDRED_FIFTY_SIX_KB: UInt32 = 0x40000
+let FIVE_HUNDRED_TWELVE_KB: UInt32 = 0x80000
 let ONE_MB: UInt32 = 0x100000
 let TWO_MB: UInt32 = 0x200000
+let FOUR_MB: UInt32 = 0x400000
+let EIGHT_MB: UInt32 = 0x800000
 
 let RAM_BANK_MASK: Address = 0x1FFF  // The size of one RAM bank on the Game Boy for masking purposes
 
@@ -210,7 +217,6 @@ class Memory {
         // Note that overall ranges (like I/O registers) must come AFTER more specific entries (like joystick or video registers)
         
         switch address {
-                
             case MemoryLocations.timerRegistersRange:
                 return .timerRegisters
             case MemoryLocations.joypad:

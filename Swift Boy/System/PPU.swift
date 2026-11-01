@@ -719,97 +719,97 @@ class PPU: MemoryMappedDevice {
     
     func readRegister(_ address: Address) -> UInt8 {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
-            // During these times any reads return 0xFF becuase the memory is blocked
-            // It would also trigger OAM corruption, which we'll ignore
-            return 0xFF
-        case MemoryLocations.objectAttributeMemoryRange:
-            // The rest of the time it just returns 0x00 no matter what's in the memory
-            return 0x00
-        case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
-            // During this time you can't access the video RAM, so we'll return 0xFF
-            return 0xFF
-        case MemoryLocations.videoRAMRange:
-            // You're allowed to access video RAM during this time, so have at it
-            return videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)]
-        case LCD_CONTROL:
-            return lcdControl
-        case LCD_STATUS:
-            return lcdStatus
-        case VIEWPORT_Y:
-            return viewportY
-        case VIEWPORT_X:
-            return viewportX
-        case LCD_Y_COORDINATE where GAMEBOY_DOCTOR:
-            // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
-            return 0x90
-        case LCD_Y_COORDINATE:
-            return lcdYCoordinate
-        case LCD_Y_COMPARE:
-            return lcdYCompare
-        case DMA_REGISTER:
-            return dmaController.readRegister(address)
-        case BACKGROUND_PALETTE:
-            return backgroundPalette
-        case WINDOW_Y:
-            return windowY
-        case WINDOW_X:
-            return windowX
-        default:
-            return 0xFF     // This location doesn't exist. Nice try.
+            case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
+                // During these times any reads return 0xFF becuase the memory is blocked
+                // It would also trigger OAM corruption, which we'll ignore
+                return 0xFF
+            case MemoryLocations.objectAttributeMemoryRange:
+                // The rest of the time it just returns 0x00 no matter what's in the memory
+                return 0x00
+            case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
+                // During this time you can't access the video RAM, so we'll return 0xFF
+                return 0xFF
+            case MemoryLocations.videoRAMRange:
+                // You're allowed to access video RAM during this time, so have at it
+                return videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)]
+            case LCD_CONTROL:
+                return lcdControl
+            case LCD_STATUS:
+                return lcdStatus
+            case VIEWPORT_Y:
+                return viewportY
+            case VIEWPORT_X:
+                return viewportX
+            case LCD_Y_COORDINATE where GAMEBOY_DOCTOR:
+                // For the Gameboy Doctor to help us test things, the LCD's LY register needs to always read 0x90
+                return 0x90
+            case LCD_Y_COORDINATE:
+                return lcdYCoordinate
+            case LCD_Y_COMPARE:
+                return lcdYCompare
+            case DMA_REGISTER:
+                return dmaController.readRegister(address)
+            case BACKGROUND_PALETTE:
+                return backgroundPalette
+            case WINDOW_Y:
+                return windowY
+            case WINDOW_X:
+                return windowX
+            default:
+                return 0xFF     // This location doesn't exist. Nice try.
         }
     }
     
     func writeRegister(_ address: Address, _ value: UInt8) {
         switch address {
-        case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
-            // During these times the memory is blocked and you can't write
-            
-            return
-        case MemoryLocations.objectAttributeMemoryRange:
-            // The rest of the time writing is OK
-         
-            oamRAM[Int(address - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
-        case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
-            // During this time you can't access the video RAM, so you can't write
-
-            return
-        case MemoryLocations.videoRAMRange:
-            // You're allowed to access video RAM during this time, so have at it
-            
-            videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)] = value
-        case LCD_CONTROL:
-            // When the LCD is disabled we'll set our internal state so it's sane on restart
-            
-            if value & LCDControl.lcdEnable == 0 && lcdControl & LCDControl.lcdEnable > 0 {
-                lcdYCoordinate = VBLANK_START           // The first line of the vertical blank period
-                ticksIntoLine = 0                       // We'll restart at the start of the line
-                ppuMode = PPUMode.verticalBlank         // We'll be in the vertical blank
-            }
-            
-            lcdControl = value
-        case LCD_STATUS:
-            lcdStatus = value
-        case VIEWPORT_Y:
-            viewportY = value
-        case VIEWPORT_X:
-            viewportX = value
-        case LCD_Y_COORDINATE:
-            // Read-only, sorry
-            
-            return
-        case LCD_Y_COMPARE:
-            lcdYCompare = value
-        case DMA_REGISTER:
-            return dmaController.writeRegister(address, value)
-        case BACKGROUND_PALETTE:
-            backgroundPalette = value
-        case WINDOW_Y:
-            windowY = value
-        case WINDOW_X:
-            windowX = value
-        default:
-            return      // This location doesn't exist. Nice try.
+            case MemoryLocations.objectAttributeMemoryRange where PPUMode.oamBlockedStatus.contains(ppuMode):
+                // During these times the memory is blocked and you can't write
+                
+                return
+            case MemoryLocations.objectAttributeMemoryRange:
+                // The rest of the time writing is OK
+                
+                oamRAM[Int(address - MemoryLocations.objectAttributeMemoryRange.lowerBound)] = value
+            case MemoryLocations.videoRAMRange where ppuMode == PPUMode.drawingToLCD:
+                // During this time you can't access the video RAM, so you can't write
+                
+                return
+            case MemoryLocations.videoRAMRange:
+                // You're allowed to access video RAM during this time, so have at it
+                
+                videoRAM[Int(address - MemoryLocations.videoRAMRange.lowerBound)] = value
+            case LCD_CONTROL:
+                // When the LCD is disabled we'll set our internal state so it's sane on restart
+                
+                if value & LCDControl.lcdEnable == 0 && lcdControl & LCDControl.lcdEnable > 0 {
+                    lcdYCoordinate = VBLANK_START           // The first line of the vertical blank period
+                    ticksIntoLine = 0                       // We'll restart at the start of the line
+                    ppuMode = PPUMode.verticalBlank         // We'll be in the vertical blank
+                }
+                
+                lcdControl = value
+            case LCD_STATUS:
+                lcdStatus = value
+            case VIEWPORT_Y:
+                viewportY = value
+            case VIEWPORT_X:
+                viewportX = value
+            case LCD_Y_COORDINATE:
+                // Read-only, sorry
+                
+                return
+            case LCD_Y_COMPARE:
+                lcdYCompare = value
+            case DMA_REGISTER:
+                return dmaController.writeRegister(address, value)
+            case BACKGROUND_PALETTE:
+                backgroundPalette = value
+            case WINDOW_Y:
+                windowY = value
+            case WINDOW_X:
+                windowX = value
+            default:
+                return      // This location doesn't exist. Nice try.
         }
     }
 }

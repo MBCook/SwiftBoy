@@ -483,33 +483,33 @@ class PulseWithPeriodSweep: AudioChannel {
             // We're at channel 1 addresses
             
             switch address {
-            case SC1_SWEEP:
-                return sweepRegister
-            case SC1_LENGTH_DUTY:
-                return lengthAndDutyCycleRegister
-            case SC1_VOLUME_ENVELOPE:
-                return volumeAndEnvelopeRegister
-            case SC1_PERIOD_LOW:
-                return periodLowRegister
-            case SC1_PERIOD_HIGH_CONTROL:
-                return periodHighAndControlRegister
-            default:
-                return 0xFF     // This location doesn't exist. Nice try.
+                case SC1_SWEEP:
+                    return sweepRegister
+                case SC1_LENGTH_DUTY:
+                    return lengthAndDutyCycleRegister
+                case SC1_VOLUME_ENVELOPE:
+                    return volumeAndEnvelopeRegister
+                case SC1_PERIOD_LOW:
+                    return periodLowRegister
+                case SC1_PERIOD_HIGH_CONTROL:
+                    return periodHighAndControlRegister
+                default:
+                    return 0xFF     // This location doesn't exist. Nice try.
             }
         } else {
             // We're at channel 2 addresses
             
             switch address {
-            case SC2_LENGTH_DUTY:
-                return lengthAndDutyCycleRegister
-            case SC2_VOLUME_ENVELOPE:
-                return volumeAndEnvelopeRegister
-            case SC2_PERIOD_LOW:
-                return periodLowRegister
-            case SC2_PERIOD_HIGH_CONTROL:
-                return periodHighAndControlRegister
-            default:
-                return 0xFF     // This location doesn't exist. Nice try.
+                case SC2_LENGTH_DUTY:
+                    return lengthAndDutyCycleRegister
+                case SC2_VOLUME_ENVELOPE:
+                    return volumeAndEnvelopeRegister
+                case SC2_PERIOD_LOW:
+                    return periodLowRegister
+                case SC2_PERIOD_HIGH_CONTROL:
+                    return periodHighAndControlRegister
+                default:
+                    return 0xFF     // This location doesn't exist. Nice try.
             }
         }
     }
