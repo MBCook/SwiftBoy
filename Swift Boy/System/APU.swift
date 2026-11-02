@@ -301,6 +301,11 @@ class APU: MemoryMappedDevice {
     // MARK: - Tick functions
     
     func tick(_ ticks: Ticks) {
+        guard ticks > 0 else {
+            // First frame ticks = 0, which callers below can't handle, so don't bother
+            return
+        }
+        
         // Tick each channel. This lets them book-keep so when we need to collect a sample we have what we need
         
         channels.forEach { c in c.tick(ticks) }

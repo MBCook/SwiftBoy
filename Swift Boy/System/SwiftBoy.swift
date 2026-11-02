@@ -196,16 +196,16 @@ actor SwiftBoy {
                 nextFrameStart = now
             }
             
-            frameCounter &+= 1
-            
-            let timeUsed = start.duration(to: end)
-            let frameTime = Double(timeUsed.components.seconds) + Double(timeUsed.components.attoseconds) / Double(1e18)
-            
-            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameTime
-            
-            if frameCounter % 60 == 0 {
-                printFrameStats()
-            }
+//            frameCounter &+= 1
+//            
+//            let timeUsed = start.duration(to: end)
+//            let frameTime = Double(timeUsed.components.seconds) + Double(timeUsed.components.attoseconds) / Double(1e18)
+//            
+//            frameTimes[frameCounter % FRAME_SAMPLE_COUNT] = frameTime
+//            
+//            if frameCounter % 60 == 0 {
+//                printFrameStats()
+//            }
         }
     }
     

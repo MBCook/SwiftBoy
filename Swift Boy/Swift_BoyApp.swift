@@ -37,13 +37,14 @@ struct Swift_BoyApp: App {
         
 //        romURL = URL(filePath: "/Users/michael/Downloads/mooneye/manual-only/sprite_priority.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Dr. Mario.gb")
-        romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
+//        romURL = URL(filePath: "/Users/michael/Downloads/GB/Kirby.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Super Mario Land.gb")
-//        romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
+        romURL = URL(filePath: "/Users/michael/Downloads/GB/Tetris.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Adventure Island.gb")
-//        romURL = URL(filePath: "/Users/michael/Downloads/GB/Balloon Fight.gb")
+//        romURL = URL(filePath: "/Users/michael/Downloads/GB/Balloon Kid.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Bubble Bobble.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Link's Awakening.gb")
+//        romURL = URL(filePath: "/Users/michael/Downloads/GB/Pokemon Red.gb")
 //        romURL = URL(filePath: "/Users/michael/Downloads/GB/Pokemon Yellow.gb")
         
 //        romURL = URL(filePath: "/Users/michael/Downloads/gb-test-roms-master/cpu_instrs/cpu_instrs.gb")

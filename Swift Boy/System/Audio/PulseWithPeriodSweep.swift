@@ -264,7 +264,7 @@ class PulseWithPeriodSweep: AudioChannel {
             return
         }
         
-        for _ in 0...ticks {
+        for _ in 1...ticks {
             periodCounter += 1
             
             if periodCounter >= 0x0800 {
