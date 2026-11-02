@@ -90,6 +90,9 @@ class MBC2: Cartridge {
                     romBank = 1     // No selecting bank 0, that's always available elsewhere
                 }
             }
+        } else if address >= 0x4000 && address <= 0x7FFF {
+            // Ignored
+            return
         } else {
             fatalError("Cartridge should not have been given address 0x\(toHex(address)) to write to")
         }

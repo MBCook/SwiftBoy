@@ -97,6 +97,9 @@ class MBC5: Cartridge {
                 // Set the 4 bits for the RAM bank
                 
                 ramBank = value & 0x0F
+            case 0x6000...0x7FFF:
+                // Ignored
+                return
             default:
                 fatalError("Cartridge should not have been given address 0x\(toHex(address)) to write to")
         }

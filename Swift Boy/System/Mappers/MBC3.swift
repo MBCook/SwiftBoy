@@ -105,6 +105,9 @@ class MBC3: Cartridge {
                 } else {
                     ramBank = value     // Already clamped to a good value by the if
                 }
+            case 0x6000...0x7FFF:
+                // RTC or just nothing, we ignore it
+                return
             default:
                 fatalError("Cartridge should not have been given address 0x\(toHex(address)) to write to")
         }
