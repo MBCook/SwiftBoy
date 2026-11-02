@@ -190,16 +190,16 @@ class PPU: MemoryMappedDevice {
         return dmaController.dmaInProgress()
     }
     
+    
     func tick(_ ticks: Ticks) -> [InterruptSource]? {
-        // If the LCD is off, we don't draw or do anything.
+        // DMA runs independently of the LCD, so always advance it before checking LCD state.
+        dmaController.tick(ticks)
+        
+        // If the LCD is off, we don't draw or update LCD modes.
         
         guard lcdControl & LCDControl.lcdEnable > 0 else {
             return nil
         }
-        
-        // First, update the DMA controller
-        
-        dmaController.tick(ticks)
         
         // Now update our modes and do drawing work if necessary.
         // NOTE: We track things in ticks (~1 MHz) not dots (~4 MHz), so make sure to use the right units!
@@ -751,6 +751,10 @@ class PPU: MemoryMappedDevice {
                 return dmaController.readRegister(address)
             case BACKGROUND_PALETTE:
                 return backgroundPalette
+            case SPRITE_PALETTE_ZERO:
+                return spritePaletteZero
+            case SPRITE_PALETTE_ONE:
+                return spritePaletteOne
             case WINDOW_Y:
                 return windowY
             case WINDOW_X:
@@ -804,6 +808,10 @@ class PPU: MemoryMappedDevice {
                 return dmaController.writeRegister(address, value)
             case BACKGROUND_PALETTE:
                 backgroundPalette = value
+            case SPRITE_PALETTE_ZERO:
+                spritePaletteZero = value
+            case SPRITE_PALETTE_ONE:
+                spritePaletteOne = value
             case WINDOW_Y:
                 windowY = value
             case WINDOW_X:

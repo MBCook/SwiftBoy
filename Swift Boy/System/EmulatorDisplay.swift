@@ -24,9 +24,16 @@ final class EmulatorDisplay: ObservableObject {
             // Palette is called TU GBP Clean from https://github.com/trashuncle/Gameboy_Palettes
             // Colors are in order of white, light, dark, black
             
-            let reds: [UInt8] = [0xF0, 0xB0, 0x9B, 0x37]
-            let greens: [UInt8] = [0xFE, 0xC2, 0xA4, 0x41]
-            let blues: [UInt8] = [0xF8, 0xAD, 0x95, 0x35]
+//            let reds: [UInt8] = [0xF0, 0xB0, 0x9B, 0x37]
+//            let greens: [UInt8] = [0xFE, 0xC2, 0xA4, 0x41]
+//            let blues: [UInt8] = [0xF8, 0xAD, 0x95, 0x35]
+
+            // Own own super basic pallet
+            
+            let reds: [UInt8] = [0xFF, 0xAA, 0x44, 0x00]
+            let greens: [UInt8] = [0xFF, 0xAA, 0x44, 0x00]
+            let blues: [UInt8] = [0xFF, 0xAA, 0x44, 0x00]
+            
             
             // Do the drawing
 
